@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(New-Item -ItemType Directory -Force \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\src\\\\lib\\\\instant\")",
+      "Bash(Out-Null)",
+      "Bash(Write-Output \"OK\")",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.js\" -Pattern \"function init\\\\\\(\" -Context 0,20 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.js\" -Pattern \"^export \\\\{\" | Select-Object -First 3 | ForEach-Object { $_.Line.Substring\\(0, [Math]::Min\\(300, $_.Line.Length\\)\\) })",
+      "PowerShell($content = Get-Content \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.js\" -Raw; $start = $content.IndexOf\\(\"export {\"\\); $content.Substring\\($start, 300\\))",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.d.ts\" -Pattern \"declare function init\" | Select-Object -First 5 | ForEach-Object { $_.Line.Trim\\(\\) })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.d.ts\" -Pattern \"declare function init\" -Context 0,5 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.d.ts\" -Pattern \"InstantConfig\" -Context 0,8 | Select-Object -First 1 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(Get-Content \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\.svelte-kit\\\\ambient.d.ts\" | Select-String \"PUBLIC_INSTANT\" | Select-Object -First 3 | ForEach-Object { $_.Line })",
+      "PowerShell(cd \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\"; $env:INSTANT_ADMIN_TOKEN=\"1726b806-bea7-476b-94cf-7ded7714aa1a\"; npx instant-cli@latest push all --app 752c66ad-ae87-4feb-9042-09c4fe9781fa 2>&1)",
+      "mcp__svelte__list-sections",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.js\" -Pattern \"subscribeAuth|onAuthStateChange|_reactor\" -Context 0,3 | Select-Object -First 8 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.js\" -Pattern \"subscribeAuth\" -Context 0,5 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.js\" -Pattern \"sendMagicCode|signInWithMagicCode|verifyMagicCode\" -Context 0,8 | Select-Object -First 3 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.js\" -Pattern \"signInWithMagicCode\" -Context 0,6 | Select-Object -First 2 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\index.d.ts\" -Pattern \"AuthState|type User \" -Context 0,5 | Select-Object -First 4 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(Select-String -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\node_modules\\\\@instantdb\\\\core\\\\dist\\\\esm\\\\clientTypes.d.ts\" -Pattern \"AuthState|type User\" -Context 0,8 | Select-Object -First 4 | ForEach-Object { $_.Line; $_.Context.PostContext })",
+      "PowerShell(New-Item *)",
+      "mcp__svelte__svelte-autofixer",
+      "mcp__svelte__get-documentation",
+      "Bash(npm run *)",
+      "mcp__ide__getDiagnostics",
+      "Bash(npx svelte-check *)",
+      "Bash(node -e \"const i = require\\('@instantdb/core'\\); console.log\\(Object.keys\\(i\\).filter\\(k => k.toLowerCase\\(\\).includes\\('auth'\\)\\)\\)\")",
+      "Bash(Get-ChildItem node_modules/@instantdb/core/dist -Filter \"*.d.ts\")",
+      "Bash(Select-Object -First 5 Name)",
+      "Bash(INSTANT_ADMIN_TOKEN=1726b806-bea7-476b-94cf-7ded7714aa1a npx instant-cli@latest push perms --app 752c66ad-ae87-4feb-9042-09c4fe9781fa --yes)",
+      "Bash(npm show *)",
+      "Bash(npm install *)",
+      "Bash(node -e \"require\\('@instantdb/admin'\\)\")",
+      "Bash(node -e \"const {init} = require\\('@instantdb/admin'\\); console.log\\(typeof init\\)\")",
+      "Bash(node -e \"const a = require\\('@instantdb/admin'\\); console.log\\(Object.keys\\(a\\)\\)\")",
+      "Bash(node -e \"const {init} = require\\('@instantdb/admin'\\); const db = init\\({appId:'test',adminToken:'test'}\\); console.log\\(Object.keys\\(db\\)\\)\")",
+      "Bash(node *)",
+      "Bash(INSTANT_ADMIN_TOKEN=1726b806-bea7-476b-94cf-7ded7714aa1a npx tsx src/scripts/seed.ts)",
+      "Bash(curl -s -X POST https://api.instantdb.com/admin/query -H 'Authorization: Bearer 1726b806-bea7-476b-94cf-7ded7714aa1a' -H 'Content-Type: application/json' -d '{\"app_id\":\"752c66ad-ae87-4feb-9042-09c4fe9781fa\",\"query\":{\"$users\":{}}}')",
+      "Bash(curl *)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Halil\\\\Desktop\\\\v1\\\\src\" -Recurse | Where-Object { $_.Extension -in \".ts\",\".js\" -and $_.FullName -notmatch \"node_modules\" } | Select-Object FullName | Format-Table -AutoSize)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\src\" -Recurse | Where-Object { $_.FullName -notmatch \"node_modules\" } | Select-Object FullName | Format-Table -AutoSize)",
+      "Bash(Select-Object -First 20)"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "svelte"
+  ]
+}
