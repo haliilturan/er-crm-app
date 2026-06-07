@@ -22,8 +22,8 @@
 </script>
 
 {#if !authReady}
-	<div class="flex min-h-screen items-center justify-center bg-gray-50">
-		<div class="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent"></div>
+	<div class="flex min-h-screen items-center justify-center bg-[#0a0a0a]">
+		<div class="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent opacity-30"></div>
 	</div>
 {:else if !auth.user}
 	{@render children()}

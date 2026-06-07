@@ -164,26 +164,25 @@
 <div bind:this={selectRef} class="relative w-full">
 	<!-- Trigger -->
 	<div
-		class="flex items-center rounded-lg px-5 h-[72px] w-full border transition-colors
-			{isOpen ? 'bg-white border-blue-400' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}
+		class="flex items-center rounded-xl px-3 py-2 w-full border transition-colors
+			{isOpen ? 'bg-[#222] border-[#444]' : 'bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#444]'}
 			{disabled ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}"
 		role="combobox"
 		aria-expanded={isOpen}
 		aria-haspopup="listbox"
 		aria-controls={listboxId}
 	>
-		<div class="flex flex-col justify-center flex-1 min-w-0 gap-1.5">
-			<span
-				class="text-[11px] font-bold leading-none transition-colors
-					{filled ? 'text-gray-300' : 'text-gray-500'}"
-			>
-				{label}{required ? ' *' : ''}
-			</span>
+		<div class="flex flex-col justify-center flex-1 min-w-0 gap-1">
+			{#if label}
+				<span class="text-xs text-[#888] leading-none">
+					{label}{required ? ' *' : ''}
+				</span>
+			{/if}
 			<input
 				bind:this={triggerInputRef}
 				type="text"
-				class="bg-transparent border-none outline-none text-[15px] leading-none
-					{filled ? 'text-gray-800' : 'text-gray-400'} cursor-pointer"
+				class="bg-transparent border-none outline-none text-sm leading-none
+					{filled ? 'text-white' : 'text-[#555]'} cursor-pointer"
 				placeholder={isOpen && searchable ? searchPlaceholder : placeholder}
 				value={triggerValue}
 				{disabled}
@@ -199,17 +198,20 @@
 		</div>
 		<button
 			type="button"
-			class="flex items-center justify-center shrink-0 ml-3 p-1.5 rounded
-				text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+			class="flex items-center justify-center shrink-0 ml-2 text-[#555] hover:text-[#888] transition-colors"
 			onclick={toggleList}
 			aria-label={isOpen ? 'Kapat' : 'Aç'}
 		>
 			<svg
 				class="w-4 h-4 transition-transform {isOpen ? 'rotate-180' : ''}"
-				viewBox="0 0 20 16"
-				fill="currentColor"
+				viewBox="0 0 24 24"
+				fill="none"
+				stroke="currentColor"
+				stroke-width="2"
+				stroke-linecap="round"
+				stroke-linejoin="round"
 			>
-				<polygon points="10,16 0,0 20,0" />
+				<path d="M6 9l6 6 6-6" />
 			</svg>
 		</button>
 	</div>
@@ -223,23 +225,23 @@
 			style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px; width: {dropdownPosition.width}px; min-width: 120px;"
 		>
 			<div
-				class="bg-white border border-gray-200 rounded-lg shadow-lg py-2 max-h-60 overflow-y-auto"
+				class="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-lg py-1.5 max-h-60 overflow-y-auto"
 				id={listboxId}
 				role="listbox"
 			>
-				{#each Object.entries(filteredGrouped) as [group, opts]}
+				{#each Object.entries(filteredGrouped) as [group, opts] (group)}
 					{#if group}
-						<div class="px-4 py-1.5 text-[11px] font-semibold text-gray-400 uppercase tracking-wider">
+						<div class="px-3 py-1 text-[11px] font-semibold text-[#555] uppercase tracking-wider">
 							{group}
 						</div>
 					{/if}
-					{#each opts as opt}
+					{#each opts as opt (opt.value)}
 						<button
 							type="button"
-							class="flex w-full px-4 py-2.5 text-[15px] text-left transition-colors
+							class="flex w-full px-3 py-2 text-sm text-left transition-colors
 								{opt.value === value
-									? 'bg-blue-50 text-blue-700 font-medium'
-									: 'text-gray-700 hover:bg-gray-50'}"
+									? 'bg-[#333] text-white font-medium'
+									: 'text-[#888] hover:bg-[#222] hover:text-white'}"
 							role="option"
 							aria-selected={opt.value === value}
 							onclick={() => selectOption(opt)}
@@ -249,7 +251,7 @@
 					{/each}
 				{/each}
 				{#if searchQuery.trim() && Object.keys(filteredGrouped).length === 0}
-					<div class="px-4 py-3 text-sm text-gray-400 text-center">Sonuç bulunamadı</div>
+					<div class="px-3 py-2.5 text-sm text-[#555] text-center">Sonuç bulunamadı</div>
 				{/if}
 			</div>
 		</div>

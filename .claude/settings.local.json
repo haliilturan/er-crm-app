@@ -41,7 +41,10 @@
       "Bash(curl *)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Halil\\\\Desktop\\\\v1\\\\src\" -Recurse | Where-Object { $_.Extension -in \".ts\",\".js\" -and $_.FullName -notmatch \"node_modules\" } | Select-Object FullName | Format-Table -AutoSize)",
       "PowerShell(Get-ChildItem \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\src\" -Recurse | Where-Object { $_.FullName -notmatch \"node_modules\" } | Select-Object FullName | Format-Table -AutoSize)",
-      "Bash(Select-Object -First 20)"
+      "Bash(Select-Object -First 20)",
+      "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\MONSTER\\\\Desktop\\\\erp-app\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\Users\\\\MONSTER\\\\Desktop\\\\erp-app\"\\), \"\" } | Sort-Object)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\MONSTER\\\\Desktop\\\\erp-app\" -File)",
+      "Bash(Select-Object -ExpandProperty Name)"
     ]
   },
   "enableAllProjectMcpServers": true,

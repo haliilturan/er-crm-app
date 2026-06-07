@@ -10,14 +10,12 @@
  */
 
 import { init, id, tx } from '@instantdb/core';
-import { PUBLIC_INSTANT_APP_ID } from '$env/static/public';
 import schema from './schema';
 
 export const db = init({
-	appId: PUBLIC_INSTANT_APP_ID,
+	appId: import.meta.env.VITE_INSTANT_APP_ID as string,
 	schema,
-	// Geliştirme modunda InstantDB DevTools panelini aç
-	devtool: import.meta.env.DEV
+	devtool: false
 });
 
 // Sık kullanılan InstantDB yardımcılarını db ile birlikte export et

@@ -36,12 +36,12 @@
 </script>
 
 <div
-	class="flex items-center justify-center rounded-full bg-gray-200 shrink-0 overflow-hidden {sizeClass[size]}"
+	class="flex items-center justify-center rounded-full bg-[#333] shrink-0 overflow-hidden {sizeClass[size]}"
 	aria-hidden="true"
 >
 	{#if image}
 		<img src={image} alt="" class="w-full h-full object-cover" />
 	{:else}
-		<span class="font-bold text-gray-500">{letters}</span>
+		<span class="font-bold text-[#888]">{letters}</span>
 	{/if}
 </div>

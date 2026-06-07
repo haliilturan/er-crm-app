@@ -34,7 +34,6 @@
 		errorMsg = '';
 		try {
 			await db.auth.signInWithMagicCode({ email: email.trim(), code: trimmedCode });
-			// +layout.svelte auth listener /dashboard'a yönlendirir
 		} catch (err: unknown) {
 			const msg = (err as { body?: { message?: string } })?.body?.message;
 			errorMsg = msg ?? 'Kod geçersiz veya süresi dolmuş. Lütfen tekrar deneyin.';
@@ -53,31 +52,31 @@
 	<title>Giriş — ERP-CRM</title>
 </svelte:head>
 
-<main class="flex min-h-screen items-center justify-center bg-gray-50 px-4">
+<main class="flex min-h-screen items-center justify-center bg-[#0a0a0a] px-4">
 	<div class="w-full max-w-sm">
 		<!-- Logo / Başlık -->
 		<div class="mb-8 text-center">
-			<div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-blue-600">
+			<div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#1a1a1a] border border-[#2a2a2a]">
 				<svg class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
 				</svg>
 			</div>
-			<h1 class="text-2xl font-bold text-gray-900">ERP-CRM</h1>
-			<p class="mt-1 text-sm text-gray-500">Şirket yönetim paneli</p>
+			<h1 class="text-2xl font-bold text-white">ERP-CRM</h1>
+			<p class="mt-1 text-sm text-[#888]">Şirket yönetim paneli</p>
 		</div>
 
 		<!-- Kart -->
-		<div class="rounded-2xl bg-white p-8 shadow-sm ring-1 ring-gray-200">
+		<div class="rounded-2xl bg-[#111111] border border-[#2a2a2a] p-8">
 			{#if step === 'email'}
 				<!-- Adım 1: E-posta -->
 				<div class="mb-6">
-					<h2 class="text-lg font-semibold text-gray-900">Giriş yap</h2>
-					<p class="mt-1 text-sm text-gray-500">E-posta adresinize tek kullanımlık kod göndereceğiz.</p>
+					<h2 class="text-lg font-semibold text-white">Giriş yap</h2>
+					<p class="mt-1 text-sm text-[#888]">E-posta adresinize tek kullanımlık kod göndereceğiz.</p>
 				</div>
 
 				<form onsubmit={sendCode} class="space-y-4">
 					<div>
-						<label for="email" class="block text-sm font-medium text-gray-700">E-posta</label>
+						<label for="email" class="block text-sm font-medium text-[#888]">E-posta</label>
 						<input
 							id="email"
 							type="email"
@@ -86,21 +85,21 @@
 							autocomplete="email"
 							required
 							disabled={isLoading}
-							class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm text-gray-900 placeholder-gray-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50 disabled:text-gray-400"
+							class="mt-1 block w-full rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-3 py-2.5 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none focus:ring-1 focus:ring-[#555] disabled:opacity-50"
 						/>
 					</div>
 
 					{#if errorMsg}
-						<p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{errorMsg}</p>
+						<p class="rounded-lg bg-[#2a1a1a] border border-[#ff4444]/30 px-3 py-2 text-sm text-[#ff4444]">{errorMsg}</p>
 					{/if}
 
 					<button
 						type="submit"
 						disabled={isLoading || !email.trim()}
-						class="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+						class="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-[#e0e0e0] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						{#if isLoading}
-							<span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+							<span class="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent"></span>
 							Gönderiliyor...
 						{:else}
 							Kod gönder
@@ -111,15 +110,15 @@
 			{:else}
 				<!-- Adım 2: Kod doğrulama -->
 				<div class="mb-6">
-					<h2 class="text-lg font-semibold text-gray-900">Kodu girin</h2>
-					<p class="mt-1 text-sm text-gray-500">
-						<span class="font-medium text-gray-700">{email}</span> adresine 6 haneli kod gönderdik.
+					<h2 class="text-lg font-semibold text-white">Kodu girin</h2>
+					<p class="mt-1 text-sm text-[#888]">
+						<span class="font-medium text-white">{email}</span> adresine 6 haneli kod gönderdik.
 					</p>
 				</div>
 
 				<form onsubmit={verifyCode} class="space-y-4">
 					<div>
-						<label for="code" class="block text-sm font-medium text-gray-700">Doğrulama kodu</label>
+						<label for="code" class="block text-sm font-medium text-[#888]">Doğrulama kodu</label>
 						<input
 							id="code"
 							type="text"
@@ -130,21 +129,21 @@
 							maxlength="6"
 							required
 							disabled={isLoading}
-							class="mt-1 block w-full rounded-lg border border-gray-300 px-3 py-2.5 text-center text-lg font-mono tracking-[0.5em] text-gray-900 placeholder-gray-300 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500 disabled:bg-gray-50"
+							class="mt-1 block w-full rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-3 py-2.5 text-center text-lg font-mono tracking-[0.5em] text-white placeholder-[#555] focus:border-[#555] focus:outline-none focus:ring-1 focus:ring-[#555] disabled:opacity-50"
 						/>
 					</div>
 
 					{#if errorMsg}
-						<p class="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">{errorMsg}</p>
+						<p class="rounded-lg bg-[#2a1a1a] border border-[#ff4444]/30 px-3 py-2 text-sm text-[#ff4444]">{errorMsg}</p>
 					{/if}
 
 					<button
 						type="submit"
 						disabled={isLoading || code.trim().length < 6}
-						class="flex w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-medium text-white transition hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+						class="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-[#e0e0e0] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
 					>
 						{#if isLoading}
-							<span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+							<span class="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent"></span>
 							Doğrulanıyor...
 						{:else}
 							Giriş yap
@@ -155,7 +154,7 @@
 						type="button"
 						onclick={goBack}
 						disabled={isLoading}
-						class="w-full text-center text-sm text-gray-500 hover:text-gray-700 disabled:opacity-50"
+						class="w-full text-center text-sm text-[#888] hover:text-white transition-colors disabled:opacity-50"
 					>
 						← Farklı e-posta kullan
 					</button>
@@ -163,7 +162,7 @@
 			{/if}
 		</div>
 
-		<p class="mt-6 text-center text-xs text-gray-400">
+		<p class="mt-6 text-center text-xs text-[#555]">
 			Şifre yok. Sadece e-posta.
 		</p>
 	</div>

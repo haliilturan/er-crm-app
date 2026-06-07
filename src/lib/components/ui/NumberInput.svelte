@@ -43,14 +43,14 @@
 </script>
 
 <div
-	class="flex items-center rounded-lg px-5 h-[72px] w-full border transition-colors
-		bg-gray-50 border-gray-200 focus-within:bg-white focus-within:border-blue-400"
+	class="flex items-center rounded-xl px-3 h-[56px] w-full border transition-colors
+		bg-[#1a1a1a] border-[#2a2a2a] focus-within:border-[#555]"
 >
-	<div class="flex flex-col justify-center flex-1 gap-1.5">
+	<div class="flex flex-col justify-center flex-1 gap-1">
 		<label
 			for={id}
-			class="text-[11px] font-bold leading-none cursor-pointer transition-colors
-				{filled ? 'text-gray-300' : 'text-gray-500'}"
+			class="text-xs leading-none cursor-pointer transition-colors
+				{filled ? 'text-[#555]' : 'text-[#888]'}"
 		>
 			{label}{required ? ' *' : ''}
 		</label>
@@ -67,8 +67,8 @@
 			{oninput}
 			{onchange}
 			bind:value
-			class="bg-transparent border-none outline-none text-[15px] text-gray-800
-				placeholder-gray-300 w-full leading-none
+			class="bg-transparent border-none outline-none text-sm text-white
+				placeholder-[#555] w-full leading-none
 				disabled:opacity-50 disabled:cursor-not-allowed
 				[appearance:textfield]
 				[&::-webkit-outer-spin-button]:appearance-none
@@ -81,7 +81,7 @@
 			{disabled}
 			onclick={increment}
 			aria-label="Artır"
-			class="flex items-center justify-center text-gray-400 hover:text-gray-700
+			class="flex items-center justify-center text-[#555] hover:text-white
 				disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 		>
 			<svg class="w-4 h-3" viewBox="0 0 20 16" fill="currentColor">
@@ -93,7 +93,7 @@
 			{disabled}
 			onclick={decrement}
 			aria-label="Azalt"
-			class="flex items-center justify-center text-gray-400 hover:text-gray-700
+			class="flex items-center justify-center text-[#555] hover:text-white
 				disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
 		>
 			<svg class="w-4 h-3" viewBox="0 0 20 16" fill="currentColor">

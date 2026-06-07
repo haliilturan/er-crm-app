@@ -31,13 +31,13 @@
 </script>
 
 <div
-	class="flex flex-col rounded-lg px-5 py-4 w-full border transition-colors
-		bg-gray-50 border-gray-200 focus-within:bg-white focus-within:border-blue-400"
+	class="flex flex-col rounded-xl px-3 py-2.5 w-full border transition-colors
+		bg-[#1a1a1a] border-[#2a2a2a] focus-within:border-[#555]"
 >
 	<label
 		for={id}
-		class="text-[11px] font-bold leading-none mb-2 cursor-pointer transition-colors
-			{filled ? 'text-gray-300' : 'text-gray-500'}"
+		class="text-xs leading-none mb-2 cursor-pointer transition-colors
+			{filled ? 'text-[#555]' : 'text-[#888]'}"
 	>
 		{label}{required ? ' *' : ''}
 	</label>
@@ -53,8 +53,8 @@
 		{onfocus}
 		{onblur}
 		bind:value
-		class="bg-transparent border-none outline-none resize-none text-[15px] text-gray-800
-			placeholder-gray-300 w-full leading-relaxed
+		class="bg-transparent border-none outline-none resize-none text-sm text-white
+			placeholder-[#555] w-full leading-relaxed
 			disabled:opacity-50 disabled:cursor-not-allowed"
 	></textarea>
 </div>

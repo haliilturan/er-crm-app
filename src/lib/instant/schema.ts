@@ -226,6 +226,16 @@ const schema = i.schema({
 			language: i.string(),
 			notes: i.string().optional(),
 			internalNotes: i.string().optional(),
+			// Nakliye detayları
+			deliveryFirm:       i.string().optional(),
+			// "receiver" | "sender"
+			deliveryPayment:    i.string().optional(),
+			// "none" | "semi" | "full"
+			installationType:   i.string().optional(),
+			// Banka hesap bilgisi (serbest metin)
+			bankAccount:        i.string().optional(),
+			// Üretim süresi (serbest metin, örn: "4-6 hafta")
+			productionDuration: i.string().optional(),
 			createdBy: i.string(),
 			createdAt: i.number().indexed(),
 			updatedBy: i.string().optional(),

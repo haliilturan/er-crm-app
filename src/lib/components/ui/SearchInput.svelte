@@ -1,15 +1,13 @@
 <script lang="ts">
 	let {
-		label = 'Ara',
 		value = $bindable(''),
-		placeholder = '',
+		placeholder = 'Search...',
 		disabled = false,
 		name = '',
 		id = `search-${Math.random().toString(36).slice(2, 9)}`,
 		onsearch,
 		onclear
 	}: {
-		label?: string;
 		value?: string;
 		placeholder?: string;
 		disabled?: boolean;
@@ -29,57 +27,35 @@
 	}
 </script>
 
-<div
-	class="flex items-center rounded-lg px-5 h-[72px] w-full border transition-colors
-		bg-gray-50 border-gray-200 focus-within:bg-white focus-within:border-blue-400"
->
-	<div class="flex flex-col justify-center flex-1 min-w-0 gap-1.5">
-		<label
-			for={id}
-			class="text-[11px] font-bold leading-none cursor-pointer transition-colors
-				{filled ? 'text-gray-300' : 'text-gray-500'}"
-		>
-			{label}
-		</label>
-		<input
-			bind:this={inputEl}
-			{id}
-			type="text"
-			{name}
-			{placeholder}
-			{disabled}
-			bind:value
-			onkeydown={(e) => e.key === 'Enter' && onsearch?.(value)}
-			class="bg-transparent border-none outline-none text-[15px] text-gray-800
-				placeholder-gray-300 w-full leading-none
-				disabled:opacity-50 disabled:cursor-not-allowed"
-		/>
-	</div>
-
-	{#if filled}
-		<button
-			type="button"
-			onclick={handleClear}
-			aria-label="Temizle"
-			class="flex items-center justify-center shrink-0 ml-3 p-1.5 rounded
-				text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-		>
-			<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
-				<path d="M18 6L6 18M6 6l12 12" />
+<div class="relative w-full">
+	<input
+		bind:this={inputEl}
+		{id}
+		type="text"
+		{name}
+		{placeholder}
+		{disabled}
+		bind:value
+		onkeydown={(e) => e.key === 'Enter' && onsearch?.(value)}
+		class="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl pl-3 pr-9 py-2
+			text-white text-sm placeholder-[#555] outline-none transition-colors
+			focus:border-[#444] disabled:opacity-50 disabled:cursor-not-allowed"
+	/>
+	<button
+		type="button"
+		onclick={filled ? handleClear : () => inputEl?.focus()}
+		aria-label={filled ? 'Temizle' : 'Ara'}
+		class="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#888] transition-colors"
+	>
+		{#if filled}
+			<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+				<path d="M18 6L6 18M6 6l12 12" stroke-linecap="round" />
 			</svg>
-		</button>
-	{:else}
-		<button
-			type="button"
-			onclick={() => inputEl?.focus()}
-			aria-label="Odaklan"
-			class="flex items-center justify-center shrink-0 ml-3 p-1.5 rounded
-				text-gray-400 hover:text-gray-700 hover:bg-gray-100 transition-colors"
-		>
-			<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+		{:else}
+			<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 				<circle cx="11" cy="11" r="8" />
-				<path d="M21 21l-4.35-4.35" />
+				<path d="M21 21l-4.35-4.35" stroke-linecap="round" />
 			</svg>
-		</button>
-	{/if}
+		{/if}
+	</button>
 </div>

@@ -29,23 +29,23 @@
 	}
 </script>
 
-<div class="inline-flex bg-gray-100 rounded-full p-1">
+<div class="inline-flex gap-1">
 	{#each tabs as tab (tab.value)}
 		<button
 			type="button"
 			{disabled}
 			onclick={() => select(tab)}
 			title={variant === 'icon' ? tab.label : undefined}
-			class="flex items-center justify-center rounded-full transition-all font-bold text-[15px]
+			class="flex items-center justify-center rounded-full transition-all text-sm
 				disabled:opacity-50 disabled:cursor-not-allowed
-				{variant === 'icon' ? 'w-[38px] h-[38px]' : 'px-4 h-[38px]'}
+				{variant === 'icon' ? 'w-9 h-9' : 'px-4 py-1'}
 				{value === tab.value
-					? 'bg-blue-600 text-white shadow-sm'
-					: 'bg-transparent text-gray-500 hover:text-gray-700'}"
+					? 'bg-white text-black font-medium'
+					: 'text-[#888] hover:text-white'}"
 		>
 			{#if variant === 'icon' && tab.icon}
 				{@const TabIcon = tab.icon}
-				<TabIcon size={20} />
+				<TabIcon size={18} />
 			{:else}
 				{tab.label}
 			{/if}

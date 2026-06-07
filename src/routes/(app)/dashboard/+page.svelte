@@ -14,10 +14,10 @@
 	} from 'lucide-svelte';
 
 	const MODULES = [
-		{ id: 'satis', title: 'Satış', description: 'Müşteri İlişkileri', href: '/satis', icon: ShoppingBag },
-		{ id: 'uretim', title: 'Üretim', description: 'Üretim Operasyonları', href: '/uretim', icon: Settings2 },
-		{ id: 'depo', title: 'Depo', description: 'Stok ve Malzeme Yönetimi', href: '/depo', icon: Package },
-		{ id: 'satin-alma', title: 'Satın Alma', description: 'Tedarik Süreçleri', href: '/satin-alma', icon: ShoppingCart },
+		{ id: 'satis', title: 'Satış', description: 'Müşteri İlişkileri', href: '/satis/musteriler', icon: ShoppingBag },
+		{ id: 'uretim', title: 'Üretim', description: 'Üretim Operasyonları', href: '/uretim/siparisler', icon: Settings2 },
+		{ id: 'depo', title: 'Depo', description: 'Stok ve Malzeme Yönetimi', href: '/depo/stok', icon: Package },
+		{ id: 'satin-alma', title: 'Satın Alma', description: 'Tedarik Süreçleri', href: '/satin-alma/talepler', icon: ShoppingCart },
 		{ id: 'sevkiyat', title: 'Sevkiyat', description: 'Kargo ve Nakliye Yönetimi', href: '/sevkiyat', icon: Truck },
 		{ id: 'finans', title: 'Finans', description: 'Finans Operasyonları', href: '/finans', icon: DollarSign },
 		{ id: 'projeler', title: 'Projeler', description: 'Proje ve Toplantı Yönetimi', href: '/projeler', icon: FolderOpen },
@@ -36,7 +36,7 @@
 <div class="flex h-full overflow-hidden gap-3 p-4">
 
 	<!-- ═══ page-aside ══════════════════════════════════════════════════════════ -->
-	<section class="flex w-[340px] shrink-0 flex-col gap-3 overflow-hidden rounded-2xl border border-gray-100 bg-white p-5">
+	<section class="flex w-[340px] shrink-0 flex-col gap-3 overflow-hidden rounded-2xl border border-[#2a2a2a] bg-[#111111] p-5">
 		<div class="shrink-0">
 			<SectionHead title="Kontrol Merkezi" description="Temel Fonksiyonel Birimler" />
 		</div>
@@ -56,16 +56,16 @@
 	<section class="flex min-w-0 flex-1 items-center justify-center">
 		{#if activeCompany.current}
 			<div class="flex flex-col items-center gap-4 text-center">
-				<div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-blue-600 text-3xl font-bold text-white shadow-lg">
+				<div class="flex h-20 w-20 items-center justify-center rounded-2xl bg-[#222] border border-[#2a2a2a] text-3xl font-bold text-white">
 					{initial(activeCompany.current.name)}
 				</div>
 				<div>
-					<p class="text-2xl font-bold text-gray-800">{activeCompany.current.name}</p>
-					<p class="mt-1 text-sm text-gray-400">Soldan bir modül seçerek başlayın</p>
+					<p class="text-2xl font-bold text-white">{activeCompany.current.name}</p>
+					<p class="mt-1 text-sm text-[#888]">Soldan bir modül seçerek başlayın</p>
 				</div>
 			</div>
 		{:else}
-			<p class="text-sm text-gray-400">Soldan bir modül seçin</p>
+			<p class="text-sm text-[#888]">Soldan bir modül seçin</p>
 		{/if}
 	</section>
 </div>

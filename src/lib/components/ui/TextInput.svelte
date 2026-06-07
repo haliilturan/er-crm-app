@@ -1,12 +1,13 @@
 <script lang="ts">
 	let {
-		label = 'Label',
+		label = '',
 		value = $bindable(''),
 		placeholder = '',
 		required = false,
 		disabled = false,
 		name = '',
 		type = 'text',
+		error = '',
 		id = `input-${Math.random().toString(36).slice(2, 9)}`,
 		oninput,
 		onchange,
@@ -20,27 +21,21 @@
 		disabled?: boolean;
 		name?: string;
 		type?: 'text' | 'email' | 'password' | 'tel' | 'url';
+		error?: string;
 		id?: string;
 		oninput?: (e: Event) => void;
 		onchange?: (e: Event) => void;
 		onfocus?: (e: FocusEvent) => void;
 		onblur?: (e: FocusEvent) => void;
 	} = $props();
-
-	let filled = $derived(value.length > 0);
 </script>
 
-<div
-	class="flex flex-col justify-center rounded-lg px-5 h-[72px] w-full border transition-colors
-		bg-gray-50 border-gray-200 focus-within:bg-white focus-within:border-blue-400"
->
-	<label
-		for={id}
-		class="text-[11px] font-bold leading-none mb-1.5 cursor-pointer transition-colors
-			{filled ? 'text-gray-300' : 'text-gray-500'}"
-	>
-		{label}{required ? ' *' : ''}
-	</label>
+<div class="flex flex-col gap-1.5 w-full">
+	{#if label}
+		<label for={id} class="text-xs text-[#888]">
+			{label}{#if required}<span class="text-[#ff4444] ml-0.5">*</span>{/if}
+		</label>
+	{/if}
 	<input
 		{id}
 		{type}
@@ -53,8 +48,13 @@
 		{onfocus}
 		{onblur}
 		bind:value
-		class="bg-transparent border-none outline-none text-[15px] text-gray-800
-			placeholder-gray-300 w-full leading-none
-			disabled:opacity-50 disabled:cursor-not-allowed"
+		class="w-full bg-[#1a1a1a] border rounded-xl px-3 py-2 text-white text-sm
+			placeholder-[#555] outline-none transition-colors
+			focus:border-[#444]
+			disabled:opacity-50 disabled:cursor-not-allowed
+			{error ? 'border-[#ff4444]' : 'border-[#2a2a2a]'}"
 	/>
+	{#if error}
+		<p class="text-xs text-[#ff4444]">{error}</p>
+	{/if}
 </div>

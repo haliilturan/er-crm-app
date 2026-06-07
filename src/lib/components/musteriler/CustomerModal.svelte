@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { db, id, tx } from '$lib/instant';
-	import { activeCompany } from '$lib/stores/activeCompany.svelte';
+	import { authStore } from '$lib/stores/auth.svelte';
 	import { SectionHead, TextInput, TextArea, Select, Button } from '$lib/components/ui';
 
 	// ─── Props ────────────────────────────────────────────────────────────────
@@ -140,7 +140,8 @@
 		e.preventDefault();
 		attempted = true;
 		if (!formValid) return;
-		if (!activeCompany.current) { saveError = 'Aktif şirket seçilmedi.'; return; }
+		const companyId = authStore.activeCompanyId;
+		if (!companyId) { saveError = 'Aktif şirket bulunamadı.'; return; }
 		if (!userId) { saveError = 'Oturum bilgisi yüklenemedi.'; return; }
 
 		saving    = true;
@@ -169,7 +170,7 @@
 				await db.transact([
 					tx.customers[newId].update({
 						...body,
-						companyId:  activeCompany.current.id,
+						companyId,
 						assignedTo: userId,
 						createdBy:  userId,
 						createdAt:  Date.now()
@@ -197,10 +198,10 @@
 </script>
 
 <!-- ─── Panel: fills its container ──────────────────────────────────────────── -->
-<div class="flex h-full flex-col overflow-hidden bg-white">
+<div class="flex h-full flex-col overflow-hidden bg-[#111111]">
 
 	<!-- ── Header ───────────────────────────────────────────────────────────── -->
-	<div class="shrink-0 border-b border-gray-100 px-6 py-5">
+	<div class="shrink-0 border-b border-[#2a2a2a] px-6 py-5">
 		<div class="flex items-start justify-between gap-3">
 			<SectionHead
 				title={form.name || (isNew ? 'Yeni Müşteri' : 'Müşteri Düzenle')}
@@ -210,8 +211,8 @@
 				type="button"
 				onclick={onClose}
 				aria-label="Kapat"
-				class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-gray-400
-					transition-colors hover:bg-gray-100 hover:text-gray-600"
+				class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#555]
+					transition-colors hover:bg-[#222] hover:text-white"
 			>
 				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -223,7 +224,7 @@
 	<!-- ── Body ─────────────────────────────────────────────────────────────── -->
 	{#if loading}
 		<div class="flex flex-1 items-center justify-center">
-			<div class="h-7 w-7 animate-spin rounded-full border-2 border-blue-500 border-t-transparent"></div>
+			<div class="h-7 w-7 animate-spin rounded-full border-2 border-white border-t-transparent opacity-30"></div>
 		</div>
 
 	{:else}
@@ -234,7 +235,6 @@
 				class="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-5 py-5"
 				style="scrollbar-width: none;"
 			>
-				<!-- Müşteri Adı -->
 				<div>
 					<TextInput
 						label="Müşteri Adı *"
@@ -243,11 +243,10 @@
 						required
 					/>
 					{#if attempted && !form.name.trim()}
-						<p class="mt-1.5 px-1 text-xs text-red-500">Bu alan zorunludur.</p>
+						<p class="mt-1.5 px-1 text-xs text-[#ff4444]">Bu alan zorunludur.</p>
 					{/if}
 				</div>
 
-				<!-- Müşteri Tipi -->
 				<Select
 					label="Müşteri Tipi"
 					bind:value={form.companyType}
@@ -255,7 +254,6 @@
 					searchable={false}
 				/>
 
-				<!-- Durum -->
 				<Select
 					label="Durum"
 					bind:value={form.status}
@@ -263,7 +261,6 @@
 					searchable={false}
 				/>
 
-				<!-- Yetkili -->
 				<TextInput
 					label="Yetkili Adı"
 					bind:value={form.contactName}
@@ -276,7 +273,6 @@
 					placeholder="Örn: Satın Alma Müdürü"
 				/>
 
-				<!-- Telefon -->
 				<div>
 					<TextInput
 						label="Telefon *"
@@ -286,11 +282,10 @@
 						required
 					/>
 					{#if attempted && !form.phone.trim()}
-						<p class="mt-1.5 px-1 text-xs text-red-500">Bu alan zorunludur.</p>
+						<p class="mt-1.5 px-1 text-xs text-[#ff4444]">Bu alan zorunludur.</p>
 					{/if}
 				</div>
 
-				<!-- E-posta -->
 				<TextInput
 					label="E-posta"
 					bind:value={form.email}
@@ -298,21 +293,18 @@
 					placeholder="ornek@firma.com"
 				/>
 
-				<!-- Ülke -->
 				<TextInput
 					label="Ülke"
 					bind:value={form.country}
 					placeholder="Türkiye"
 				/>
 
-				<!-- Şehir -->
 				<TextInput
 					label="Şehir"
 					bind:value={form.city}
 					placeholder="İstanbul"
 				/>
 
-				<!-- Adres -->
 				<TextArea
 					label="Adres"
 					bind:value={form.address}
@@ -320,14 +312,12 @@
 					rows={3}
 				/>
 
-				<!-- Vergi No -->
 				<TextInput
 					label="Vergi No"
 					bind:value={form.taxNumber}
 					placeholder="1234567890"
 				/>
 
-				<!-- Kaynak -->
 				<Select
 					label="Kaynak"
 					bind:value={form.source}
@@ -336,14 +326,13 @@
 					searchable={false}
 				/>
 
-				<!-- Save error -->
 				{#if saveError}
-					<p class="rounded-lg bg-red-50 px-4 py-3 text-sm text-red-600">{saveError}</p>
+					<p class="rounded-xl bg-[#2a1a1a] border border-[#ff4444]/30 px-4 py-3 text-sm text-[#ff4444]">{saveError}</p>
 				{/if}
 			</div>
 
 			<!-- Footer -->
-			<div class="shrink-0 flex items-center justify-between gap-3 border-t border-gray-100 px-5 py-4">
+			<div class="shrink-0 flex items-center justify-between gap-3 border-t border-[#2a2a2a] px-5 py-4">
 				<Button variant="ghost" type="button" onclick={onClose}>İptal</Button>
 				<Button
 					type="submit"

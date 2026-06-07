@@ -8,7 +8,7 @@
 		onclick,
 		children
 	}: {
-		variant?: 'default' | 'icon' | 'ghost' | 'danger';
+		variant?: 'default' | 'active' | 'icon' | 'ghost' | 'danger';
 		disabled?: boolean;
 		type?: 'button' | 'submit' | 'reset';
 		onclick?: (e: MouseEvent) => void;
@@ -16,10 +16,11 @@
 	} = $props();
 
 	const variantClass: Record<string, string> = {
-		default: 'h-11 rounded-full px-6 bg-blue-600 text-white hover:bg-blue-700 active:bg-blue-800 text-[15px] font-bold',
-		icon: 'h-11 w-11 rounded-xl bg-gray-100 text-gray-600 hover:bg-gray-200',
-		ghost: 'h-11 rounded-full px-6 bg-transparent text-gray-600 hover:bg-gray-100 text-[15px]',
-		danger: 'h-11 rounded-full px-6 bg-red-600 text-white hover:bg-red-700 text-[15px] font-bold'
+		active: 'px-4 py-1.5 rounded-full bg-white text-black text-sm font-medium hover:bg-[#e0e0e0]',
+		default: 'px-4 py-1.5 rounded-full bg-[#222] text-white border border-[#2a2a2a] text-sm hover:bg-[#2a2a2a]',
+		ghost: 'px-4 py-1.5 rounded-full bg-transparent text-[#888] hover:text-white text-sm',
+		icon: 'p-2 rounded-full bg-[#222] text-[#888] hover:text-white border border-[#2a2a2a]',
+		danger: 'px-4 py-1.5 rounded-full bg-[#ff4444] text-white text-sm hover:bg-[#ff2222]'
 	};
 </script>
 
