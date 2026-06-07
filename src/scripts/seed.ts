@@ -1,16 +1,17 @@
 /**
  * Seed script — development only.
- * Creates 3 companies and links hilalfirca@gmail.com as admin to each.
+ * Creates 5 companies and links hilalfirca@gmail.com as admin to each.
+ * Idempotent: skips records that already exist (checks by slug / email).
  *
  * Run:
  *   INSTANT_ADMIN_TOKEN=<token> npx tsx src/scripts/seed.ts
  */
 import { init, id, tx } from '@instantdb/admin';
 
-const APP_ID     = '752c66ad-ae87-4feb-9042-09c4fe9781fa';
+const APP_ID      = '752c66ad-ae87-4feb-9042-09c4fe9781fa';
 const ADMIN_TOKEN = process.env.INSTANT_ADMIN_TOKEN!;
 const TARGET_EMAIL = 'hilalfirca@gmail.com';
-const API_BASE   = 'https://api.instantdb.com';
+const API_BASE    = 'https://api.instantdb.com';
 
 if (!ADMIN_TOKEN) {
 	console.error('❌  INSTANT_ADMIN_TOKEN env var eksik.');
@@ -36,6 +37,8 @@ const COMPANIES = [
 	{ name: 'Hilal Fırça', slug: 'hilal-firca' },
 	{ name: 'Euromak',     slug: 'euromak'     },
 	{ name: 'Mix7',        slug: 'mix7'        },
+	{ name: 'Teknocall',   slug: 'teknocall'   },
+	{ name: 'Teksa',       slug: 'teksa'       },
 ] as const;
 
 // ─── Main ─────────────────────────────────────────────────────────────────────
@@ -57,22 +60,56 @@ async function main() {
 	}
 	console.log(`✓  Kullanıcı: ${userId}\n`);
 
-	// ── 2. ID'leri üret ────────────────────────────────────────────────────
+	// ── 2. Mevcut verileri sorgula (idempotency) ───────────────────────────
+	console.log('→ Mevcut veriler kontrol ediliyor...');
+
+	type Company     = { id: string; slug: string; name: string };
+	type UserProfile = { id: string; email: string };
+	type UserCompany = { id: string; companyId: string };
+
+	const existing = await db.query({
+		companies:    {},
+		userProfiles: {},
+		userCompanies: { $: { where: { userId } } },
+	}) as {
+		companies:    Company[];
+		userProfiles: UserProfile[];
+		userCompanies: UserCompany[];
+	};
+
+	const existingSlugs      = new Set(existing.companies.map(c => c.slug));
+	const existingProfile    = existing.userProfiles.find(p => p.email === TARGET_EMAIL);
+	const existingCompanyIds = new Set(existing.userCompanies.map(uc => uc.companyId));
+
+	console.log(`  Mevcut şirket slug'ları : [${[...existingSlugs].join(', ')}]`);
+	console.log(`  Mevcut profil           : ${existingProfile ? existingProfile.id : 'yok'}`);
+	console.log(`  Mevcut üyelik sayısı    : ${existingCompanyIds.size}\n`);
+
+	// ── 3. Eksik şirket ve üyelikleri hesapla ─────────────────────────────
 	const now = Date.now();
 
-	const companies = COMPANIES.map(c => ({
-		...c,
-		companyId: id(),
-		ucId:      id(),
-	}));
-	const profileId = id();
+	const toCreate = COMPANIES
+		.filter(c => !existingSlugs.has(c.slug))
+		.map(c => ({ ...c, companyId: id(), ucId: id() }));
 
-	// ── 3. Transaction ────────────────────────────────────────────────────
+	const profileId   = existingProfile?.id ?? id();
+	const needsProfile = !existingProfile;
+
+	if (toCreate.length === 0 && !needsProfile) {
+		console.log('✅  Tüm veriler zaten mevcut, işlem yapılmadı.');
+		COMPANIES.forEach(c => console.log(`  ⚠  ${c.name} (mevcut)`));
+		return;
+	}
+
+	console.log(`→ Yazılacak şirket sayısı : ${toCreate.length}`);
+	console.log(`→ Profil                  : ${needsProfile ? 'oluşturulacak' : 'mevcut (atlanıyor)'}\n`);
+
+	// ── 4. Transaction ────────────────────────────────────────────────────
 	console.log('→ Veriler yazılıyor...');
 
-	await db.transact([
-		// Şirketler
-		...companies.map(c =>
+	const ops = [
+		// Yeni şirketler
+		...toCreate.map(c =>
 			tx.companies[c.companyId].update({
 				name:      c.name,
 				slug:      c.slug,
@@ -81,17 +118,19 @@ async function main() {
 			})
 		),
 
-		// userProfile + $users linkini kur
-		tx.userProfiles[profileId].update({
-			email:     TARGET_EMAIL,
-			fullName:  'Hilal',
-			createdAt: now,
-			updatedAt: now,
-		}),
-		tx.userProfiles[profileId].link({ user: userId }),
+		// userProfile (gerekirse)
+		...(needsProfile ? [
+			tx.userProfiles[profileId].update({
+				email:     TARGET_EMAIL,
+				fullName:  'Hilal',
+				createdAt: now,
+				updatedAt: now,
+			}),
+			tx.userProfiles[profileId].link({ user: userId }),
+		] : []),
 
-		// Her şirket için üyelik kaydı ve linkler
-		...companies.flatMap(c => [
+		// Her yeni şirket için üyelik + linkler
+		...toCreate.flatMap(c => [
 			tx.userCompanies[c.ucId].update({
 				userId,
 				companyId: c.companyId,
@@ -101,15 +140,27 @@ async function main() {
 			tx.userCompanies[c.ucId].link({ profile: profileId }),
 			tx.userCompanies[c.ucId].link({ company: c.companyId }),
 		]),
-	]);
+	];
 
-	// ── 4. Özet ────────────────────────────────────────────────────────────
+	await db.transact(ops);
+
+	// ── 5. Özet ────────────────────────────────────────────────────────────
 	console.log('\n✅  Seed tamamlandı!\n');
-	console.log('Oluşturulan şirketler:');
-	companies.forEach(c => console.log(`  ✓  ${c.name}  (${c.companyId})`));
-	console.log(`\nuserProfile  : ${profileId}`);
-	console.log(`userCompanies: ${companies.map(c => c.ucId).join(', ')}`);
-	console.log(`\n${TARGET_EMAIL} → 3 şirkette admin olarak tanımlandı.`);
+
+	if (toCreate.length > 0) {
+		console.log('Oluşturulan şirketler:');
+		toCreate.forEach(c => console.log(`  ✓  ${c.name}  (${c.companyId})`));
+	}
+
+	const skipped = COMPANIES.filter(c => existingSlugs.has(c.slug));
+	if (skipped.length > 0) {
+		console.log('\nAtlanan şirketler (zaten mevcut):');
+		skipped.forEach(c => console.log(`  ⚠  ${c.name}`));
+	}
+
+	console.log(`\nuserProfile  : ${profileId}${needsProfile ? ' (yeni)' : ' (mevcut)'}`);
+	console.log(`userCompanies: ${toCreate.map(c => c.ucId).join(', ') || 'yok (hepsi mevcut)'}`);
+	console.log(`\n${TARGET_EMAIL} → 5 şirkette admin olarak tanımlandı.`);
 }
 
 main().catch(err => {

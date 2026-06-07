@@ -68,6 +68,7 @@ const schema = i.schema({
 			phone: i.string().indexed(),
 			email: i.string().optional(),
 			country: i.string().optional(),
+			state: i.string().optional(),
 			city: i.string().optional(),
 			address: i.string().optional(),
 			taxNumber: i.string().optional(),
@@ -84,7 +85,10 @@ const schema = i.schema({
 			createdBy: i.string(),
 			createdAt: i.number().indexed(),
 			updatedBy: i.string().optional(),
-			updatedAt: i.number().optional()
+			updatedAt: i.number().optional(),
+			website: i.string().optional(),
+			phoneLandline: i.string().optional(),
+			deliveryAddress: i.string().optional()
 		}),
 
 		/**

@@ -41,6 +41,7 @@
 	},
 	"dependencies": {
 		"@instantdb/core": "^1.0.43",
+		"country-state-city": "^3.2.1",
 		"idb": "^8.0.3",
 		"lucide-svelte": "^1.0.1",
 		"zod": "^4.4.3"

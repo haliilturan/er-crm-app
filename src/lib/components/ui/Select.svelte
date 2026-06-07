@@ -235,7 +235,7 @@
 							{group}
 						</div>
 					{/if}
-					{#each opts as opt (opt.value)}
+					{#each opts as opt, i (opt.value + '|' + i)}
 						<button
 							type="button"
 							class="flex w-full px-3 py-2 text-sm text-left transition-colors
