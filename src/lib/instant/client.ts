@@ -13,7 +13,7 @@ import { init, id, tx } from '@instantdb/core';
 import schema from './schema';
 
 export const db = init({
-	appId: import.meta.env.VITE_INSTANT_APP_ID as string,
+	appId: import.meta.env.VITE_INSTANT_APP_ID ?? '752c66ad-ae87-4feb-9042-09c4fe9781fa',
 	schema,
 	devtool: false
 });

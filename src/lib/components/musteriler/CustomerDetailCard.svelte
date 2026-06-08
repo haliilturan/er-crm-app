@@ -47,7 +47,11 @@
 		status: string;
 		currency: string;
 		totalWithVat: number;
+		subtotal?: number;
+		totalVat?: number;
+		notes?: string;
 		createdAt: number;
+		items?: any[];
 	};
 
 	type OrderRow = {
@@ -56,7 +60,38 @@
 		status: string;
 		currency: string;
 		totalWithVat: number;
+		subtotal?: number;
+		totalVat?: number;
+		notes?: string;
 		createdAt: number;
+		items?: any[];
+	};
+
+	type LangCode = 'tr' | 'en' | 'ru' | 'ar' | 'fr';
+	type LangDict = {
+		quote: string; order: string;
+		quoteNo: string; orderNo: string;
+		date: string; customer: string;
+		product: string; qty: string; unitPrice: string; total: string;
+		subtotal: string; vat: string; grandTotal: string;
+		included: string; notes: string;
+	};
+
+	// ─── PDF i18n ─────────────────────────────────────────────────────────────
+	const LANGS: { code: LangCode; label: string; flag: string }[] = [
+		{ code: 'tr', label: 'Türkçe',  flag: '🇹🇷' },
+		{ code: 'en', label: 'English', flag: '🇬🇧' },
+		{ code: 'ru', label: 'Русский', flag: '🇷🇺' },
+		{ code: 'ar', label: 'العربية', flag: '🇸🇦' },
+		{ code: 'fr', label: 'Français', flag: '🇫🇷' },
+	];
+
+	const PDF_I18N: Record<LangCode, LangDict> = {
+		tr: { quote: 'TEKLIF', order: 'SIPARIS', quoteNo: 'Teklif No', orderNo: 'Siparis No', date: 'Tarih', customer: 'Musteri', product: 'Urun Adi', qty: 'Miktar', unitPrice: 'Birim Fiyat', total: 'Toplam', subtotal: 'Ara Toplam', vat: 'KDV', grandTotal: 'GENEL TOPLAM', included: 'Dahil', notes: 'Notlar' },
+		en: { quote: 'QUOTATION', order: 'ORDER', quoteNo: 'Quote No', orderNo: 'Order No', date: 'Date', customer: 'Customer', product: 'Product', qty: 'Qty', unitPrice: 'Unit Price', total: 'Total', subtotal: 'Subtotal', vat: 'VAT', grandTotal: 'GRAND TOTAL', included: 'Included', notes: 'Notes' },
+		ru: { quote: 'PREDLOZHENIE', order: 'ZAKAZ', quoteNo: 'Nomer pred.', orderNo: 'Nomer zakaza', date: 'Data', customer: 'Klient', product: 'Tovar', qty: 'Kol-vo', unitPrice: 'Tsena/ed.', total: 'Itogo', subtotal: 'Promezhutok', vat: 'NDS', grandTotal: 'OBSHCHIY ITOG', included: 'V komplekte', notes: 'Zametki' },
+		ar: { quote: 'ARD AL-ASAAR', order: 'TALAB', quoteNo: 'Raqm al-ard', orderNo: 'Raqm al-talab', date: 'Al-tarikh', customer: 'Al-amil', product: 'Al-muntaj', qty: 'Al-kam.', unitPrice: 'Seer/wahda', total: 'Al-majmou', subtotal: 'Majm. al-fari', vat: 'Al-dareeba', grandTotal: 'AL-MAJMOU AL-KULLI', included: 'Marfaq', notes: 'Mulahazat' },
+		fr: { quote: 'DEVIS', order: 'COMMANDE', quoteNo: 'N° Devis', orderNo: 'N° Commande', date: 'Date', customer: 'Client', product: 'Produit', qty: 'Qté', unitPrice: 'Prix unit.', total: 'Total', subtotal: 'Sous-total', vat: 'TVA', grandTotal: 'TOTAL GÉNÉRAL', included: 'Inclus', notes: 'Notes' },
 	};
 
 	// ─── Constants ────────────────────────────────────────────────────────────
@@ -111,6 +146,31 @@
 	let noteSaving    = $state(false);
 	let noteError     = $state('');
 
+	let langModalOpen  = $state(false);
+	let langForType    = $state<'quote' | 'order'>('quote');
+	let langForEntity  = $state<QuoteRow | OrderRow | null>(null);
+	let pdfGenerating  = $state(false);
+
+	let allQuoteItems = $state<any[]>([]);
+	let allOrderItems = $state<any[]>([]);
+
+	let detailOpen    = $state(false);
+	let detailType    = $state<'quote' | 'order'>('quote');
+	let detailEntity  = $state<QuoteRow | OrderRow | null>(null);
+	let detailLoading = $state(false);
+
+	let detailItems = $derived(
+		detailType === 'quote'
+			? allQuoteItems.filter((i: any) => i.quoteId === detailEntity?.id)
+			: allOrderItems.filter((i: any) => i.orderId === detailEntity?.id)
+	);
+	let detailItemsSorted = $derived(
+		[...detailItems].sort((a: any, b: any) => {
+			if (a.isIncludedPart !== b.isIncludedPart) return a.isIncludedPart ? 1 : -1;
+			return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+		})
+	);
+
 	let noteValid = $derived(noteForm.content.trim().length > 0);
 
 	// ─── Helpers ──────────────────────────────────────────────────────────────
@@ -135,12 +195,46 @@
 		return amount.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + currency;
 	}
 
+	function normPdf(s: string): string {
+		return (s ?? '')
+			.replace(/ğ/g, 'g').replace(/Ğ/g, 'G').replace(/ş/g, 's').replace(/Ş/g, 'S')
+			.replace(/ı/g, 'i').replace(/İ/g, 'I').replace(/ç/g, 'c').replace(/Ç/g, 'C')
+			.replace(/ö/g, 'o').replace(/Ö/g, 'O').replace(/ü/g, 'u').replace(/Ü/g, 'U');
+	}
+
+	function truncatePdf(s: string, max = 44): string {
+		const n = normPdf(s);
+		return n.length > max ? n.slice(0, max - 2) + '..' : n;
+	}
+
+	function fmtPdf(amount: number, sym: string): string {
+		return (amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + sym;
+	}
+
 	// ─── Timer ───────────────────────────────────────────────────────────────
 	let noteTimer: ReturnType<typeof setTimeout> | undefined;
 	onDestroy(() => clearTimeout(noteTimer));
 
-	// ─── Auth ─────────────────────────────────────────────────────────────────
-	onMount(() => db.subscribeAuth((s) => { userId = s.user?.id ?? null; }));
+	// ─── Auth + global item subscriptions (component ömrü boyunca açık kalır) ──
+	onMount(() => {
+		const cleanupAuth = db.subscribeAuth((s) => { userId = s.user?.id ?? null; });
+
+		const cleanupQuoteItems = db.subscribeQuery(
+			{ quoteItems: {} },
+			(result) => {
+				allQuoteItems = result.data?.quoteItems ?? [];
+			}
+		);
+
+		const cleanupOrderItems = db.subscribeQuery(
+			{ orderItems: {} },
+			(result) => {
+				allOrderItems = result.data?.orderItems ?? [];
+			}
+		);
+
+		return () => { cleanupAuth(); cleanupQuoteItems(); cleanupOrderItems(); };
+	});
 
 	// ─── Reset tab on customer change ─────────────────────────────────────────
 	$effect(() => {
@@ -217,6 +311,7 @@
 		);
 	});
 
+
 	// ─── Add note ────────────────────────────────────────────────────────────
 	async function addNote() {
 		noteAttempted = true;
@@ -243,6 +338,177 @@
 			noteError = 'Not eklenemedi. Lütfen tekrar deneyin.';
 		} finally {
 			noteSaving = false;
+		}
+	}
+
+	function openDetailModal(type: 'quote' | 'order', entity: QuoteRow | OrderRow) {
+		detailType   = type;
+		detailEntity = entity;
+		detailOpen   = true;
+	}
+
+	function openLangModal(type: 'quote' | 'order', entity: QuoteRow | OrderRow) {
+		langForType   = type;
+		langForEntity = entity;
+		langModalOpen = true;
+	}
+
+	async function loadItemsOnce(type: 'quote' | 'order', entityId: string): Promise<any[]> {
+		return new Promise((resolve) => {
+			let cleanup: (() => void) | undefined;
+			const handler = (result: any) => {
+				if (result.isLoading) return;
+				cleanup?.();
+				const key   = type === 'quote' ? 'quoteItems' : 'orderItems';
+				const field = type === 'quote' ? 'quoteId'    : 'orderId';
+				resolve((result.data?.[key] ?? []).filter((i: any) => i[field] === entityId));
+			};
+			const key   = type === 'quote' ? 'quoteItems' : 'orderItems';
+			const field = type === 'quote' ? 'quoteId'    : 'orderId';
+			cleanup = db.subscribeQuery(
+				{ [key]: { $: { where: { [field]: entityId } } } }, handler
+			);
+		});
+	}
+
+	async function generatePdf(lang: LangCode) {
+		if (!langForEntity) return;
+		langModalOpen = false;
+		pdfGenerating = true;
+		try {
+			const isQuote  = langForType === 'quote';
+			const entity   = langForEntity;
+			const items    = await loadItemsOnce(isQuote ? 'quote' : 'order', entity.id);
+			const { jsPDF } = await import('jspdf');
+			const L        = PDF_I18N[lang];
+			const sym      = entity.currency === 'TRY' ? 'TL' : entity.currency === 'USD' ? '$' : entity.currency === 'EUR' ? '€' : (entity.currency || 'TL');
+			const entityNum = normPdf(isQuote ? (entity as QuoteRow).quoteNumber : (entity as OrderRow).orderNumber);
+			const cName    = normPdf(customer?.name ?? '—');
+			const docDate  = new Date(entity.createdAt).toLocaleDateString('en-GB');
+
+			const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+			const W = 210, ML = 15, MR = 15, CW = W - ML - MR;
+			let y = 15;
+
+			// ── Title
+			doc.setFontSize(20);
+			doc.setFont('helvetica', 'bold');
+			doc.setTextColor(20, 20, 20);
+			doc.text(isQuote ? L.quote : L.order, W / 2, y, { align: 'center' });
+			y += 7;
+
+			// ── Meta line
+			doc.setFontSize(8.5);
+			doc.setFont('helvetica', 'normal');
+			doc.setTextColor(100, 100, 100);
+			const numLbl = isQuote ? L.quoteNo : L.orderNo;
+			doc.text(`${numLbl}: ${entityNum}   |   ${L.date}: ${docDate}   |   ${L.customer}: ${cName}`, W / 2, y, { align: 'center' });
+			y += 5;
+
+			// ── Separator
+			doc.setDrawColor(210, 210, 210);
+			doc.line(ML, y, W - MR, y);
+			y += 5;
+
+			// ── Column x positions
+			const cProduct   = ML;
+			const cQty       = ML + 83;
+			const cUnitPrice = ML + 109;
+			const cTotal     = ML + 148;
+			const cTotalEnd  = W - MR;
+
+			// ── Table header
+			doc.setFillColor(28, 28, 28);
+			doc.setTextColor(255, 255, 255);
+			doc.rect(ML, y, CW, 7, 'F');
+			doc.setFontSize(7.5);
+			doc.setFont('helvetica', 'bold');
+			doc.text(L.product, cProduct + 2, y + 4.8);
+			doc.text(L.qty, cQty + 8, y + 4.8, { align: 'center' });
+			doc.text(L.unitPrice, (cUnitPrice + cTotal) / 2, y + 4.8, { align: 'center' });
+			doc.text(L.total, (cTotal + cTotalEnd) / 2, y + 4.8, { align: 'center' });
+			y += 7;
+
+			// ── Rows
+			const sorted = [...items].sort((a: any, b: any) => {
+				if (a.isIncludedPart !== b.isIncludedPart) return a.isIncludedPart ? 1 : -1;
+				return (a.sortOrder ?? 0) - (b.sortOrder ?? 0);
+			});
+			doc.setFont('helvetica', 'normal');
+			sorted.forEach((item: any, idx: number) => {
+				const rowH = 6.5;
+				if (idx % 2 === 0) {
+					doc.setFillColor(246, 246, 246);
+					doc.rect(ML, y, CW, rowH, 'F');
+				}
+				doc.setFontSize(8);
+				if (item.isIncludedPart) {
+					doc.setTextColor(140, 140, 140);
+				} else {
+					doc.setTextColor(30, 30, 30);
+				}
+				doc.text(truncatePdf(item.productName ?? '', item.isIncludedPart ? 40 : 44), cProduct + 2, y + 4.5);
+				doc.text(String(item.quantity ?? 0), cQty + 8, y + 4.5, { align: 'center' });
+				doc.text(fmtPdf(item.unitPrice ?? 0, sym), cTotal - 2, y + 4.5, { align: 'right' });
+				doc.text(fmtPdf(item.lineTotalWithVat ?? 0, sym), cTotalEnd - 2, y + 4.5, { align: 'right' });
+				if (item.isIncludedPart) {
+					doc.setFontSize(6);
+					doc.text(`[${L.included}]`, cProduct + 2, y + rowH - 0.3);
+				}
+				y += rowH;
+				if (y > 265) { doc.addPage(); y = 15; }
+			});
+
+			// ── Bottom line
+			doc.setDrawColor(210, 210, 210);
+			doc.line(ML, y, W - MR, y);
+			y += 5;
+
+			// ── Totals
+			const sub   = (entity as any).subtotal   ?? 0;
+			const vat   = (entity as any).totalVat   ?? 0;
+			const grand = entity.totalWithVat ?? 0;
+			const tX    = W - MR - 65;
+
+			doc.setFontSize(8.5);
+			doc.setFont('helvetica', 'normal');
+			doc.setTextColor(100, 100, 100);
+			doc.text(L.subtotal, tX, y + 5);
+			doc.setTextColor(30, 30, 30);
+			doc.text(fmtPdf(sub, sym), W - MR - 2, y + 5, { align: 'right' });
+			y += 6;
+
+			doc.setTextColor(100, 100, 100);
+			doc.text(L.vat, tX, y + 5);
+			doc.setTextColor(30, 30, 30);
+			doc.text(fmtPdf(vat, sym), W - MR - 2, y + 5, { align: 'right' });
+			y += 6;
+
+			doc.setFillColor(28, 28, 28);
+			doc.rect(tX - 4, y, W - MR - tX + 4, 8, 'F');
+			doc.setFontSize(9);
+			doc.setFont('helvetica', 'bold');
+			doc.setTextColor(255, 255, 255);
+			doc.text(L.grandTotal, tX - 1, y + 5.5);
+			doc.text(fmtPdf(grand, sym), W - MR - 2, y + 5.5, { align: 'right' });
+			y += 12;
+
+			// ── Notes
+			const notesText = (entity as any).notes;
+			if (notesText?.trim()) {
+				doc.setFont('helvetica', 'normal');
+				doc.setFontSize(8);
+				doc.setTextColor(100, 100, 100);
+				doc.text(L.notes + ':', ML, y);
+				y += 4;
+				doc.setTextColor(60, 60, 60);
+				const wrapped = doc.splitTextToSize(normPdf(notesText), CW);
+				doc.text(wrapped, ML, y);
+			}
+
+			doc.save(`${isQuote ? 'teklif' : 'siparis'}-${entityNum}.pdf`);
+		} finally {
+			pdfGenerating = false;
 		}
 	}
 </script>
@@ -477,6 +743,23 @@
 											{#if qsc}
 												<Badge variant={qsc.variant} label={qsc.label} />
 											{/if}
+											<button
+												type="button"
+												onclick={() => openDetailModal('quote', quote)}
+												class="flex h-7 items-center rounded-lg border border-[#2a2a2a] px-2 text-xs text-[#666] transition hover:border-[#444] hover:text-white"
+												title="Detay"
+											>Detay</button>
+											<button
+												type="button"
+												onclick={() => openLangModal('quote', quote)}
+												class="flex h-7 w-7 items-center justify-center rounded-lg border border-[#2a2a2a] text-[#666] transition hover:border-[#444] hover:text-white"
+												aria-label="PDF İndir"
+												title="PDF İndir"
+											>
+												<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+													<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+												</svg>
+											</button>
 										</div>
 									</div>
 								{/each}
@@ -505,6 +788,23 @@
 										{#if osc}
 											<Badge variant={osc.variant} label={osc.label} />
 										{/if}
+										<button
+											type="button"
+											onclick={() => openDetailModal('order', order)}
+											class="flex h-7 items-center rounded-lg border border-[#2a2a2a] px-2 text-xs text-[#666] transition hover:border-[#444] hover:text-white"
+											title="Detay"
+										>Detay</button>
+										<button
+											type="button"
+											onclick={() => openLangModal('order', order)}
+											class="flex h-7 w-7 items-center justify-center rounded-lg border border-[#2a2a2a] text-[#666] transition hover:border-[#444] hover:text-white"
+											aria-label="PDF İndir"
+											title="PDF İndir"
+										>
+											<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+												<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
+											</svg>
+										</button>
 									</div>
 								</div>
 							{/each}
@@ -527,5 +827,166 @@
 {:else}
 	<div class="flex h-full items-center justify-center">
 		<p class="text-sm text-[#888]">Müşteri bulunamadı.</p>
+	</div>
+{/if}
+
+<!-- ─── Language selection modal ─────────────────────────────────────────── -->
+{#if langModalOpen}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		aria-label="PDF dil seçimi"
+		tabindex="-1"
+		onclick={() => (langModalOpen = false)}
+		onkeydown={(e) => e.key === 'Escape' && (langModalOpen = false)}
+	>
+		<div
+			class="relative w-[300px] rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a] p-6 shadow-2xl"
+			role="presentation"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<button
+				type="button"
+				onclick={() => (langModalOpen = false)}
+				class="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-[#555] hover:bg-[#2a2a2a] hover:text-white transition"
+				aria-label="Kapat"
+			>
+				<svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+					<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+				</svg>
+			</button>
+
+			<h3 class="mb-5 text-center text-sm font-bold text-white">PDF Dilini Seçin</h3>
+
+			<div class="flex flex-col gap-2">
+				{#each LANGS as lang (lang.code)}
+					<button
+						type="button"
+						disabled={pdfGenerating}
+						onclick={() => generatePdf(lang.code)}
+						class="flex items-center gap-3 rounded-xl border border-[#2a2a2a] bg-[#111] px-4 py-3 text-sm font-medium text-white transition hover:border-[#444] hover:bg-[#222] disabled:opacity-50"
+					>
+						<span class="text-xl leading-none">{lang.flag}</span>
+						<span>{lang.label}</span>
+						{#if pdfGenerating}
+							<span class="ml-auto h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
+						{/if}
+					</button>
+				{/each}
+			</div>
+
+			{#if pdfGenerating}
+				<p class="mt-4 text-center text-xs text-[#555]">PDF oluşturuluyor...</p>
+			{/if}
+		</div>
+	</div>
+{/if}
+
+<!-- ─── Detail modal ─────────────────────────────────────────────────────── -->
+{#if detailOpen && detailEntity}
+	{@const de = detailEntity}
+	{@const isQ = detailType === 'quote'}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Detay"
+		tabindex="-1"
+		onclick={() => (detailOpen = false)}
+		onkeydown={(e) => e.key === 'Escape' && (detailOpen = false)}
+	>
+		<div
+			class="relative flex w-[720px] max-h-[80vh] flex-col rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a] shadow-2xl"
+			role="presentation"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<!-- Header -->
+			<div class="shrink-0 flex items-center justify-between border-b border-[#2a2a2a] px-6 py-4">
+				<div>
+					<p class="text-base font-bold text-white">
+						{isQ ? (de as QuoteRow).quoteNumber : (de as OrderRow).orderNumber}
+					</p>
+					<p class="text-xs text-[#555] mt-0.5">
+						{formatDate(de.createdAt)}{customer ? ' · ' + customer.name : ''}
+					</p>
+				</div>
+				<div class="flex items-center gap-3">
+					{#if statusConfig[de.status]}
+						{@const sc = statusConfig[de.status]!}
+						<Badge variant={sc.variant} label={sc.label} />
+					{/if}
+					<button
+						type="button"
+						onclick={() => (detailOpen = false)}
+						class="flex h-7 w-7 items-center justify-center rounded-full text-[#555] transition hover:bg-[#2a2a2a] hover:text-white"
+						aria-label="Kapat"
+					>
+						<svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+							<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+						</svg>
+					</button>
+				</div>
+			</div>
+
+			<!-- Body -->
+			<div class="flex-1 min-h-0 overflow-y-auto p-6" style="scrollbar-width: thin;">
+				{#if detailLoading}
+					<div class="flex h-32 items-center justify-center">
+						<div class="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent opacity-30"></div>
+					</div>
+				{:else if detailItemsSorted.length === 0}
+					<p class="py-8 text-center text-sm text-[#555]">Kalem bulunamadı.</p>
+				{:else}
+					<table class="w-full text-sm">
+						<thead>
+							<tr class="border-b border-[#2a2a2a] text-left">
+								<th class="pb-2 pr-3 text-xs font-medium text-[#555]">Ürün</th>
+								<th class="pb-2 pr-3 w-16 text-xs font-medium text-[#555] text-right">Miktar</th>
+								<th class="pb-2 pr-3 w-28 text-xs font-medium text-[#555] text-right">Birim Fiyat</th>
+								<th class="pb-2 w-28 text-xs font-medium text-[#555] text-right">Tutar</th>
+							</tr>
+						</thead>
+						<tbody>
+							{#each detailItemsSorted as it (it.id)}
+								<tr class="border-b border-[#1e1e1e] {it.isIncludedPart ? 'opacity-60' : ''}">
+									<td class="py-2 pr-3">
+										<p class="{it.isIncludedPart ? 'text-[#888]' : 'text-white'}">{it.productName}</p>
+										{#if it.isIncludedPart}
+											<span class="text-[10px] text-[#555]">Dahil</span>
+										{/if}
+									</td>
+									<td class="py-2 pr-3 text-right text-[#aaa]">{it.quantity} {it.unit ?? ''}</td>
+									<td class="py-2 pr-3 text-right text-[#aaa]">{formatMoney(it.unitPrice ?? 0, de.currency)}</td>
+									<td class="py-2 text-right text-white">{formatMoney(it.lineTotalWithVat ?? 0, de.currency)}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+
+					<div class="mt-4 flex flex-col items-end gap-1.5 border-t border-[#2a2a2a] pt-4">
+						<div class="flex items-center gap-6">
+							<span class="text-xs text-[#555]">Ara Toplam</span>
+							<span class="w-36 text-right text-sm text-[#aaa]">{formatMoney((de as any).subtotal ?? 0, de.currency)}</span>
+						</div>
+						<div class="flex items-center gap-6">
+							<span class="text-xs text-[#555]">KDV</span>
+							<span class="w-36 text-right text-sm text-[#aaa]">{formatMoney((de as any).totalVat ?? 0, de.currency)}</span>
+						</div>
+						<div class="flex items-center gap-6">
+							<span class="text-xs font-semibold text-[#888]">GENEL TOPLAM</span>
+							<span class="w-36 text-right text-base font-bold text-white">{formatMoney(de.totalWithVat, de.currency)}</span>
+						</div>
+					</div>
+
+					{#if (de as any).notes?.trim()}
+						<div class="mt-4 rounded-lg border border-[#2a2a2a] bg-[#111] px-4 py-3">
+							<p class="mb-1 text-xs text-[#555]">Notlar</p>
+							<p class="whitespace-pre-wrap text-sm text-[#888]">{(de as any).notes}</p>
+						</div>
+					{/if}
+				{/if}
+			</div>
+		</div>
 	</div>
 {/if}

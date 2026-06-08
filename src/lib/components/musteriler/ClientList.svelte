@@ -29,7 +29,6 @@
 
 	let clients = $state<Client[]>([]);
 	let loading = $state(true);
-	let queryError = $state('');
 
 	function getInitials(name: string): string {
 		return name
@@ -49,18 +48,14 @@
 	}
 
 	$effect(() => {
-		const cid = authStore.activeCompanyId;
-		if (!cid) return;
+		const uid = authStore.userId;
+		if (!uid) { loading = false; return; }
+
 		loading = true;
 		return db.subscribeQuery(
-			{ customers: { $: { where: { companyId: cid }, order: { createdAt: 'desc' } } } },
+			{ customers: { $: { order: { serverCreatedAt: 'desc' } } } },
 			(res) => {
 				untrack(() => {
-					if (res.error) {
-						queryError = 'Veri yüklenemedi';
-						loading = false;
-						return;
-					}
 					clients = (res.data?.customers ?? []).map((c: any) => ({
 						id: c.id,
 						name: String(c.name ?? ''),
@@ -124,31 +119,13 @@
 	<div class="flex-1 overflow-y-auto flex flex-col gap-2 px-4 pb-4" style="scrollbar-width: none;">
 
 		{#if loading}
-			{#each [1, 2, 3] as _}
-				<div class="h-14 bg-[#222] animate-pulse rounded-2xl"></div>
+			{#each [1, 2, 3] as _, i (i)}
+				<div class="animate-pulse h-16 rounded-2xl bg-[#1a1a1a] mb-2"></div>
 			{/each}
 
-		{:else if queryError}
-			<div class="flex flex-1 items-center justify-center py-8">
-				<p class="text-sm text-red-400">{queryError}</p>
-			</div>
-
 		{:else if clients.length === 0}
-			<div class="flex flex-col items-center gap-3 py-10 text-[#555]">
-				<svg class="w-10 h-10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-					<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2" />
-					<circle cx="9" cy="7" r="4" />
-					<path d="M23 21v-2a4 4 0 00-3-3.87" />
-					<path d="M16 3.13a4 4 0 010 7.75" />
-				</svg>
-				<p class="text-sm">Henüz müşteri eklenmedi</p>
-				<button
-					type="button"
-					onclick={onNewClient}
-					class="text-xs text-white bg-[#222] border border-[#333] px-4 py-2 rounded-full hover:bg-[#2a2a2a] transition-colors"
-				>
-					Yeni Müşteri Ekle
-				</button>
+			<div class="flex items-center justify-center py-16">
+				<p class="text-[#555] text-sm">Henüz müşteri eklenmedi</p>
 			</div>
 
 		{:else}
@@ -165,7 +142,7 @@
 			{/each}
 
 			{#if filteredClients.length === 0 && searchQuery.trim()}
-				<div class="flex flex-1 items-center justify-center py-8">
+				<div class="flex items-center justify-center py-8">
 					<p class="text-sm text-[#555]">Sonuç bulunamadı</p>
 				</div>
 			{/if}

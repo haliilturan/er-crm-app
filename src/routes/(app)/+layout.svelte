@@ -1,10 +1,13 @@
 <script lang="ts">
-	import { onMount } from 'svelte';
+	import { onMount, untrack } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import type { Snippet } from 'svelte';
 	import { page } from '$app/state';
 	import { goto } from '$app/navigation';
-	import { db } from '$lib/instant';
+	import { resolve } from '$app/paths';
+	import { db, id, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
+	import { chatBridge } from '$lib/stores/chat.svelte';
 	import CockpitPanel from '$lib/components/ui/CockpitPanel.svelte';
 
 	let { children }: { children: Snippet } = $props();
@@ -38,10 +41,10 @@
 			href: '/satis',
 			path: 'M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.356-1.993l1.263 12c.07.665-.45 1.243-1.119 1.243H4.25a1.125 1.125 0 01-1.12-1.243l1.264-12A1.125 1.125 0 015.513 7.5h12.974c.576 0 1.059.435 1.119 1.007z',
 			subPages: [
-				{ label: 'Müşteriler', href: '/satis/musteriler' },
+				{ label: 'Müşteriler',  href: '/satis/musteriler' },
 				{ label: 'Haber Akışı', href: '/satis/haber-akisi' },
-				{ label: 'Raporlar', href: '/satis/raporlar' },
-				{ label: 'Taslaklar', href: '/satis/taslaklar' }
+				{ label: 'Raporlar',    href: '/satis/raporlar' },
+				{ label: 'Taslak Ürün', href: '/satis/taslaklar' }
 			]
 		},
 		{
@@ -89,7 +92,10 @@
 			label: 'Finans',
 			href: '/finans',
 			path: 'M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z',
-			subPages: []
+			subPages: [
+				{ label: 'Teklifler', href: '/finans/teklifler' },
+				{ label: 'Ödemeler',  href: '/finans/odemeler' }
+			]
 		},
 		{
 			id: 'projeler',
@@ -112,7 +118,7 @@
 	);
 
 	async function navigateToModule(mod: AppModule) {
-		await goto(mod.subPages[0]?.href ?? mod.href);
+		await goto(resolve(mod.subPages[0]?.href ?? mod.href));
 	}
 
 	function initial(name: string): string {
@@ -123,6 +129,86 @@
 		db.auth.signOut();
 		authStore.destroy();
 	}
+
+	// ─── Layout subscriptions ──────────────────────────────────────────────────
+
+	let layoutProfiles = $state<any[]>([]);
+	$effect(() => {
+		const uid = authStore.userId;
+		if (!uid) return;
+		return db.subscribeQuery(
+			{ userProfiles: {} },
+			(res) => { untrack(() => { layoutProfiles = res.data?.userProfiles ?? []; }); }
+		);
+	});
+
+	let bellCount = $state(0);
+	$effect(() => {
+		const uid = authStore.userId;
+		if (!uid) return;
+		return db.subscribeQuery(
+			{ notifications: { $: { where: { userId: uid } } } },
+			(res) => {
+				untrack(() => {
+					bellCount = ((res.data?.notifications ?? []) as any[]).filter((n) => !n.readAt).length;
+				});
+			}
+		);
+	});
+
+	type LayoutToast = { id: string; senderId: string; inis: string; name: string; preview: string };
+	let layoutToasts     = $state<LayoutToast[]>([]);
+	const _layoutSeen    = new SvelteSet<string>();
+	let _layoutReady     = false;
+
+	$effect(() => {
+		const uid = authStore.userId;
+		if (!uid) return;
+		return db.subscribeQuery(
+			{ messages: { $: { where: { receiverId: uid }, order: { createdAt: 'desc' }, limit: 100 } } },
+			(res) => {
+				untrack(() => {
+					const all = (res.data?.messages ?? []) as any[];
+					if (!_layoutReady) {
+						for (const m of all) _layoutSeen.add(m.id);
+						_layoutReady = true;
+						return;
+					}
+					for (const m of all) {
+						if (_layoutSeen.has(m.id)) continue;
+						_layoutSeen.add(m.id);
+
+						const sp   = layoutProfiles.find((p: any) => p.userId === m.senderId);
+						const name = sp?.fullName || sp?.email?.split('@')[0] || 'Biri';
+						const inis = name.split(' ').slice(0, 2).map((w: string) => w[0] ?? '').join('').toUpperCase();
+						const body = String(m.content ?? '').slice(0, 120);
+
+						// notifications namespace'ine yaz
+						const nid = id();
+						db.transact([
+							tx.notifications[nid].update({
+								userId:    uid,
+								type:      'message',
+								title:     name,
+								body,
+								entityId:  m.senderId,
+								actorName: name,
+								createdAt: Date.now()
+							})
+						]).catch(() => {});
+
+						// Toast göster (max 3)
+						if (layoutToasts.length >= 3) continue;
+						const tid = `lt-${m.id}`;
+						layoutToasts = [...layoutToasts, { id: tid, senderId: m.senderId, inis, name, preview: String(m.content ?? '').slice(0, 60) }];
+						setTimeout(() => {
+							layoutToasts = layoutToasts.filter((t) => t.id !== tid);
+						}, 5000);
+					}
+				});
+			}
+		);
+	});
 
 	let activeFilterLabel = $derived(
 		authStore.activeFilter === 'all'
@@ -180,10 +266,17 @@
 			<div class="flex shrink-0 items-center gap-1">
 
 				<!-- Notifications -->
-				<button aria-label="Bildirimler" class="flex h-8 w-8 items-center justify-center rounded-lg text-[#555] transition-colors hover:bg-[#1a1a1a] hover:text-[#888]">
+				<button
+					aria-label="Bildirimler"
+					onclick={() => chatBridge.openPulse()}
+					class="relative flex h-8 w-8 items-center justify-center rounded-lg text-[#555] transition-colors hover:bg-[#1a1a1a] hover:text-[#888]"
+				>
 					<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 						<path d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
 					</svg>
+					{#if bellCount > 0}
+						<span class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-red-500 flex items-center justify-center text-[8px] font-bold text-white px-0.5">{bellCount > 9 ? '9+' : bellCount}</span>
+					{/if}
 				</button>
 
 				<!-- Company filter -->
@@ -272,7 +365,7 @@
 					<nav class="flex flex-col gap-0.5 px-2">
 						{#each activeModule.subPages as subPage (subPage.href)}
 							<a
-								href={subPage.href}
+								href={resolve(subPage.href)}
 								class="flex items-center rounded-lg px-3 py-2 text-sm transition-colors
 									{page.url.pathname.startsWith(subPage.href)
 										? 'bg-[#222] text-white font-medium'
@@ -295,5 +388,31 @@
 				<CockpitPanel />
 			</aside>
 		</div>
+
+		<!-- ─── Mesaj toast'ları (sağ üst, fixed) ──────────────────────────────── -->
+		{#if layoutToasts.length > 0}
+			<div class="fixed top-14 right-4 flex flex-col gap-2 z-[100]" style="max-width:320px;">
+				{#each layoutToasts as t (t.id)}
+					<button
+						type="button"
+						onclick={() => {
+							chatBridge.open(t.senderId);
+							layoutToasts = layoutToasts.filter((x) => x.id !== t.id);
+						}}
+						class="flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl px-4 py-3 shadow-2xl text-left w-full hover:bg-[#222] transition-colors"
+					>
+						<div class="w-9 h-9 rounded-full bg-[#2a2a2a] border border-[#333] flex items-center justify-center text-sm font-bold text-white shrink-0">
+							{t.inis}
+						</div>
+						<div class="flex-1 min-w-0">
+							<p class="text-xs text-[#888] mb-0.5">Yeni mesaj</p>
+							<p class="text-sm text-white leading-snug truncate">
+								<span class="font-semibold">{t.name}</span><span class="text-[#888]">:&#32;{t.preview || '…'}</span>
+							</p>
+						</div>
+					</button>
+				{/each}
+			</div>
+		{/if}
 	</div>
 {/if}

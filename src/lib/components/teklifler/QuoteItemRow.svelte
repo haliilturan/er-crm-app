@@ -1,90 +1,174 @@
 <script lang="ts">
+	import { tick } from 'svelte';
 	import type { LineItem } from './QuoteForm.svelte';
-
-	type GroupedProduct = {
-		brandName: string;
-		products: Array<{
-			id: string;
-			name: string;
-			sku: string;
-			basePrice: number;
-			vatRate: number;
-			unit: string;
-		}>;
-	};
+	import type { ProductRaw } from './QuoteForm.svelte';
+	import Modal from '$lib/components/ui/Modal.svelte';
+	import ProductFormModal from '$lib/components/ui/ProductFormModal.svelte';
 
 	let {
 		item = $bindable(),
-		groups,
+		allProducts,
+		companyId,
 		onRemove
 	}: {
 		item: LineItem;
-		groups: GroupedProduct[];
+		allProducts: ProductRaw[];
+		companyId: string;
 		onRemove: () => void;
 	} = $props();
 
 	const VAT_RATES = [0, 1, 10, 20];
 	const UNITS = ['Adet', 'Kg', 'Metre', 'M²', 'M³', 'Litre', 'Paket', 'Takım', 'Set'];
 
-	let unitPrice      = $derived(item.listPrice * (1 - item.discountRate / 100));
-	let lineTotal      = $derived(unitPrice * item.quantity);
-	let vatAmount      = $derived(lineTotal * item.vatRate / 100);
-	let lineTotalVat   = $derived(lineTotal + vatAmount);
+	const ITEM_HEIGHT = 44;
+	const CONTAINER_HEIGHT = 352;
+
+	// ─── Computed row totals ──────────────────────────────────────────────────────
+	let unitPrice    = $derived(item.listPrice * (1 - item.discountRate / 100));
+	let lineTotal    = $derived(unitPrice * item.quantity);
+	let vatAmount    = $derived(lineTotal * item.vatRate / 100);
+	let lineTotalVat = $derived(lineTotal + vatAmount);
 
 	function fmt(n: number): string {
 		return n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 	}
 
-	function onProductChange(e: Event) {
-		const productId = (e.target as HTMLSelectElement).value;
-		if (!productId) {
-			item.productId   = '';
-			item.productName = '';
-			item.productSku  = '';
-			item.brandName   = '';
-			return;
+	function normalize(s: string): string {
+		return s.toLowerCase()
+			.replace(/[şŞ]/g, 's').replace(/[çÇ]/g, 'c').replace(/[ğĞ]/g, 'g')
+			.replace(/[üÜ]/g, 'u').replace(/[öÖ]/g, 'o').replace(/[ıİ]/g, 'i');
+	}
+
+	// ─── Mode 1: Search modal ─────────────────────────────────────────────────────
+	let searchOpen     = $state(false);
+	let searchRaw      = $state('');
+	let searchQuery    = $state('');
+	let highlightedIdx = $state(-1);
+	let scrollTop      = $state(0);
+	let listRef        = $state<HTMLDivElement | null>(null);
+	let searchInputRef = $state<HTMLInputElement | null>(null);
+	let debounceTimer: ReturnType<typeof setTimeout>;
+
+	function handleSearchInput(e: Event) {
+		searchRaw = (e.target as HTMLInputElement).value;
+		clearTimeout(debounceTimer);
+		debounceTimer = setTimeout(() => {
+			searchQuery = searchRaw;
+			highlightedIdx = -1;
+		}, 300);
+	}
+
+	let filtered = $derived.by(() => {
+		if (!searchQuery.trim()) return allProducts;
+		const q = normalize(searchQuery.trim());
+		return allProducts.filter((p) =>
+			normalize(p.name).includes(q) ||
+			(p.code && normalize(p.code).includes(q)) ||
+			(p.serialNo && normalize(p.serialNo).includes(q)) ||
+			(p.diameter !== undefined && String(p.diameter).includes(q))
+		);
+	});
+
+	let startIdx = $derived(Math.max(0, Math.floor(scrollTop / ITEM_HEIGHT) - 3));
+	let endIdx   = $derived(Math.min(filtered.length, startIdx + Math.ceil(CONTAINER_HEIGHT / ITEM_HEIGHT) + 6));
+	let visible  = $derived(filtered.slice(startIdx, endIdx));
+
+	$effect(() => {
+		if (listRef && highlightedIdx >= 0) {
+			const top = highlightedIdx * ITEM_HEIGHT;
+			if (top < listRef.scrollTop) listRef.scrollTop = top;
+			if (top + ITEM_HEIGHT > listRef.scrollTop + CONTAINER_HEIGHT)
+				listRef.scrollTop = top + ITEM_HEIGHT - CONTAINER_HEIGHT;
 		}
-		for (const group of groups) {
-			const p = group.products.find((p) => p.id === productId);
-			if (p) {
-				item.productId   = p.id;
-				item.productName = p.name;
-				item.productSku  = p.sku;
-				item.brandName   = group.brandName;
-				item.listPrice   = p.basePrice ?? 0;
-				item.vatRate     = p.vatRate ?? 20;
-				item.unit        = p.unit ?? 'Adet';
-				break;
+	});
+
+	async function openSearch() {
+		searchOpen = true;
+		searchRaw = '';
+		searchQuery = '';
+		highlightedIdx = -1;
+		scrollTop = 0;
+		await tick();
+		searchInputRef?.focus();
+	}
+
+	function closeSearch() {
+		searchOpen = false;
+		searchRaw = '';
+		searchQuery = '';
+		clearTimeout(debounceTimer);
+	}
+
+	function selectProduct(p: ProductRaw) {
+		item.productId       = p.id;
+		item.productName     = p.name;
+		item.productSku      = p.sku;
+		item.brandName       = p.firm ?? '';
+		item.listPrice       = p.unitPrice ?? p.basePrice ?? 0;
+		item.vatRate         = p.vatRate ?? 20;
+		item.unit            = p.unit ?? 'Adet';
+		item.productDetail   = p.detail ?? '';
+		item.productCode     = p.code ?? '';
+		item.productSerialNo = p.serialNo ?? '';
+		item.productCategory = p.category ?? '';
+		item.productFirm     = p.firm ?? '';
+		closeSearch();
+	}
+
+	function handleSearchKeydown(e: KeyboardEvent) {
+		if (e.key === 'ArrowDown') {
+			e.preventDefault();
+			highlightedIdx = Math.min(highlightedIdx + 1, filtered.length - 1);
+		} else if (e.key === 'ArrowUp') {
+			e.preventDefault();
+			highlightedIdx = Math.max(highlightedIdx - 1, 0);
+		} else if (e.key === 'Enter') {
+			e.preventDefault();
+			if (highlightedIdx >= 0 && filtered[highlightedIdx]) {
+				selectProduct(filtered[highlightedIdx]);
 			}
+		} else if (e.key === 'Escape') {
+			closeSearch();
 		}
+	}
+
+	// ─── Mode 2: Manual add modal ─────────────────────────────────────────────────
+	let manualOpen = $state(false);
+
+	function openManual() {
+		manualOpen = true;
 	}
 </script>
 
+<!-- ─── Row card ────────────────────────────────────────────────────────────── -->
 <div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
-	<!-- Row 1: Product + Remove -->
+
+	<!-- Row 1: Product trigger + Remove -->
 	<div class="mb-3 flex items-start gap-2">
 		<div class="flex-1">
-			<select
-				value={item.productId}
-				onchange={onProductChange}
-				class="w-full rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white focus:border-[#555] focus:outline-none"
+			<button
+				type="button"
+				onclick={openSearch}
+				class="w-full rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-left text-sm transition-colors hover:border-[#444] focus:border-[#555] focus:outline-none"
 			>
-				<option value="">— Ürün seçin veya serbest girin —</option>
-				{#each groups as group (group.brandName)}
-					<optgroup label={group.brandName}>
-						{#each group.products as p (p.id)}
-							<option value={p.id}>{p.name} ({p.sku})</option>
-						{/each}
-					</optgroup>
-				{/each}
-			</select>
-			{#if !item.productId}
-				<input
-					type="text"
-					bind:value={item.productName}
-					placeholder="Ürün adı..."
-					class="mt-1.5 w-full rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none"
-				/>
+				{#if item.productName}
+					<span class="text-white">{item.productName}</span>
+				{:else}
+					<span class="text-[#555]">— Ürün seçin veya ekleyin —</span>
+				{/if}
+			</button>
+			{#if item.productName && (item.productCode || item.productFirm || item.productCategory)}
+				<div class="mt-1 flex flex-wrap gap-1.5">
+					{#if item.productFirm}
+						<span class="rounded-md bg-[#222] px-2 py-0.5 text-[11px] text-[#888]">{item.productFirm}</span>
+					{/if}
+					{#if item.productCode}
+						<span class="rounded-md bg-[#222] px-2 py-0.5 text-[11px] text-[#888]">{item.productCode}</span>
+					{/if}
+					{#if item.productCategory}
+						<span class="rounded-md bg-[#222] px-2 py-0.5 text-[11px] text-[#555]">{item.productCategory}</span>
+					{/if}
+				</div>
 			{/if}
 		</div>
 		<button
@@ -155,17 +239,11 @@
 			<span class="text-[11px] text-[#555]">KDV:</span>
 			{#each VAT_RATES as rate (rate)}
 				<label class="flex cursor-pointer items-center gap-1">
-					<input
-						type="radio"
-						bind:group={item.vatRate}
-						value={rate}
-						class="accent-white"
-					/>
+					<input type="radio" bind:group={item.vatRate} value={rate} class="accent-white" />
 					<span class="text-xs text-[#888]">%{rate}</span>
 				</label>
 			{/each}
 		</div>
-
 		<div class="ml-auto flex items-center gap-4 text-sm">
 			<div class="text-right">
 				<p class="text-[11px] text-[#555]">Birim Fiyat</p>
@@ -182,7 +260,7 @@
 		</div>
 	</div>
 
-	<!-- Row 4: Notes (optional) -->
+	<!-- Row 4: Notes -->
 	<div class="mt-3">
 		<input
 			type="text"
@@ -192,3 +270,101 @@
 		/>
 	</div>
 </div>
+
+<!-- ─── Mode 1: Search Modal ──────────────────────────────────────────────────── -->
+<Modal open={searchOpen} title="Ürün Seç" width="540px" onclose={closeSearch}>
+	<div class="flex flex-col">
+		<!-- Header -->
+		<div class="border-b border-[#2a2a2a] px-4 py-3">
+			<p class="mb-2 text-sm font-semibold text-white">Ürün Seç</p>
+			<input
+				bind:this={searchInputRef}
+				type="text"
+				value={searchRaw}
+				oninput={handleSearchInput}
+				onkeydown={handleSearchKeydown}
+				placeholder="Ürün adı, kod, seri no veya çap ile ara..."
+				class="w-full rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none"
+			/>
+			<p class="mt-1.5 text-[11px] text-[#555]">{filtered.length} sonuç</p>
+		</div>
+
+		<!-- Virtualized list -->
+		<div
+			bind:this={listRef}
+			class="overflow-y-auto"
+			style="height: {CONTAINER_HEIGHT}px; scrollbar-width: thin;"
+			onscroll={(e) => { scrollTop = (e.currentTarget as HTMLDivElement).scrollTop; }}
+		>
+			<!-- Top spacer -->
+			<div style="height: {startIdx * ITEM_HEIGHT}px;"></div>
+
+			{#each visible as p, vi (p.id)}
+				{@const absoluteIdx = startIdx + vi}
+				<button
+					type="button"
+					onclick={() => selectProduct(p)}
+					class="flex w-full items-center gap-3 px-4 text-left transition-colors"
+					style="height: {ITEM_HEIGHT}px;"
+					class:bg-[#222]={absoluteIdx === highlightedIdx}
+					class:hover:bg-[#1e1e1e]={absoluteIdx !== highlightedIdx}
+				>
+					<div class="min-w-0 flex-1">
+						<p class="truncate text-sm {absoluteIdx === highlightedIdx ? 'text-white' : 'text-[#ccc]'}">{p.name}</p>
+						<p class="truncate text-[11px] text-[#555]">
+							{#if p.firm}{p.firm} ·{/if}
+							{#if p.code}{p.code} ·{/if}
+							{p.sku}
+						</p>
+					</div>
+					{#if p.unitPrice ?? p.basePrice}
+						<span class="shrink-0 text-xs text-[#888]">{fmt(p.unitPrice ?? p.basePrice ?? 0)}</span>
+					{/if}
+				</button>
+			{/each}
+
+			<!-- Bottom spacer -->
+			<div style="height: {(filtered.length - endIdx) * ITEM_HEIGHT}px;"></div>
+
+			{#if filtered.length === 0}
+				<div class="flex h-24 items-center justify-center text-sm text-[#555]">Sonuç bulunamadı</div>
+			{/if}
+		</div>
+
+		<!-- Manual add button -->
+		<div class="border-t border-[#2a2a2a] p-3">
+			<button
+				type="button"
+				onclick={openManual}
+				class="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-[#3a3a3a] py-2.5 text-sm text-[#888] transition-colors hover:border-[#555] hover:text-white"
+			>
+				<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+					<path d="M12 4.5v15m7.5-7.5h-15" />
+				</svg>
+				Listede Yok — Elle Ekle
+			</button>
+		</div>
+	</div>
+</Modal>
+
+<!-- ─── Mode 2: Product Form Modal ───────────────────────────────────────────── -->
+<ProductFormModal
+	open={manualOpen}
+	{companyId}
+	onSaved={(p) => {
+		item.productId       = p.id;
+		item.productName     = p.name;
+		item.productSku      = p.sku;
+		item.brandName       = '';
+		item.productDetail   = p.detail;
+		item.productCode     = p.code;
+		item.productSerialNo = p.serialNo;
+		item.productCategory = p.category;
+		item.productFirm     = p.firm;
+		item.vatRate         = 20;
+		item.unit            = 'Adet';
+		manualOpen           = false;
+		searchOpen           = false;
+	}}
+	onclose={() => (manualOpen = false)}
+/>

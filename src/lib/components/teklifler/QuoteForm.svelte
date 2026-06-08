@@ -12,15 +12,19 @@
 		vatRate: number;
 		notes: string;
 		isIncludedPart: boolean;
+		productDetail: string;
+		productCode: string;
+		productSerialNo: string;
+		productCategory: string;
+		productFirm: string;
 	}
 </script>
 
 <script lang="ts">
 	import { onMount, untrack } from 'svelte';
-	import { SvelteMap } from 'svelte/reactivity';
 	import { db, id, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { SectionHead } from '$lib/components/ui';
+	import { SectionHead, Modal, TextArea, Select } from '$lib/components/ui';
 	import QuoteItemRow from './QuoteItemRow.svelte';
 
 	let {
@@ -33,51 +37,81 @@
 		onSaved: () => void;
 	} = $props();
 
+	// ─── Customer name ───────────────────────────────────────────────────────────
+	let customerName = $state('');
+
+	$effect(() => {
+		const cId = customerId;
+		if (!cId) return;
+		return db.subscribeQuery(
+			{ customers: { $: { where: { id: cId } } } },
+			(result) => {
+				untrack(() => {
+					const c = (result.data?.customers ?? [])[0] as any;
+					customerName = c?.name ?? '';
+				});
+			}
+		);
+	});
+
+	// ─── Company users (for task assignment) ─────────────────────────────────────
+	type CompanyUser = { userId: string; fullName: string };
+	let companyUsers = $state<CompanyUser[]>([]);
+
+	$effect(() => {
+		const cId = companyId;
+		if (!cId) return;
+		return db.subscribeQuery(
+			{ userCompanies: { $: { where: { companyId: cId } }, profile: {} } },
+			(result) => {
+				untrack(() => {
+					companyUsers = (result.data?.userCompanies ?? [])
+						.filter((uc: any) => !!uc.profile)
+						.map((uc: any) => ({
+							userId:   String(uc.userId ?? ''),
+							fullName: String((uc.profile as any)?.fullName ?? uc.userId ?? '')
+						}));
+				});
+			}
+		);
+	});
+
+	// ─── Saved quote tracking ─────────────────────────────────────────────────────
+	let savedQuoteId     = $state('');
+	let savedQuoteNumber = $state('');
+
+	// ─── Task modal state ─────────────────────────────────────────────────────────
+	let taskModalOpen  = $state(false);
+	let taskTitle      = $state('');
+	let taskDesc       = $state('');
+	let taskAssignedTo = $state('');
+	let taskDueDate    = $state('');
+	let taskSaving     = $state(false);
+	let taskError      = $state('');
+
 	// ─── Product data ────────────────────────────────────────────────────────────
-	type ProductRaw = {
+	export type ProductRaw = {
 		id: string;
 		name: string;
 		sku: string;
 		basePrice?: number;
 		vatRate: number;
 		unit: string;
-		brand?: { id: string; name: string };
+		category?: string;
+		detail?: string;
+		code?: string;
+		serialNo?: string;
+		firm?: string;
+		diameter?: number;
+		unitPrice?: number;
+		isManual?: boolean;
 	};
 
 	let allProducts = $state<ProductRaw[]>([]);
 
-	type GroupedProduct = {
-		brandName: string;
-		products: Array<{
-			id: string;
-			name: string;
-			sku: string;
-			basePrice: number;
-			vatRate: number;
-			unit: string;
-		}>;
-	};
-
-	let productGroups = $derived.by<GroupedProduct[]>(() => {
-		const map = new SvelteMap<string, GroupedProduct>();
-		for (const p of allProducts) {
-			const bn = p.brand?.name ?? 'Markasız';
-			if (!map.has(bn)) map.set(bn, { brandName: bn, products: [] });
-			map.get(bn)!.products.push({
-				id:        p.id,
-				name:      p.name,
-				sku:       p.sku,
-				basePrice: p.basePrice ?? 0,
-				vatRate:   p.vatRate,
-				unit:      p.unit
-			});
-		}
-		return Array.from(map.values());
-	});
-
 	onMount(() => {
 		return db.subscribeQuery(
-			{ products: { $: { where: { status: 'active' } }, brand: {} } },
+			{ products: { $: { where: { status: 'active' } } } },
 			(result) => {
 				untrack(() => {
 					allProducts = (result.data?.products ?? []) as ProductRaw[];
@@ -89,18 +123,23 @@
 	// ─── Line items ──────────────────────────────────────────────────────────────
 	function emptyItem(): LineItem {
 		return {
-			tempId:         crypto.randomUUID(),
-			productId:      '',
-			productName:    '',
-			productSku:     '',
-			brandName:      '',
-			unit:           'Adet',
-			quantity:       1,
-			listPrice:      0,
-			discountRate:   0,
-			vatRate:        20,
-			notes:          '',
-			isIncludedPart: false
+			tempId:          crypto.randomUUID(),
+			productId:       '',
+			productName:     '',
+			productSku:      '',
+			brandName:       '',
+			unit:            'Adet',
+			quantity:        1,
+			listPrice:       0,
+			discountRate:    0,
+			vatRate:         20,
+			notes:           '',
+			isIncludedPart:  false,
+			productDetail:   '',
+			productCode:     '',
+			productSerialNo: '',
+			productCategory: '',
+			productFirm:     ''
 		};
 	}
 
@@ -159,10 +198,10 @@
 	let saving    = $state(false);
 	let saveError = $state('');
 
-	async function save() {
+	async function saveToDb(): Promise<string | null> {
 		const userId = authStore.userId;
-		if (!userId || !companyId) { saveError = 'Oturum veya şirket bilgisi eksik.'; return; }
-		if (items.some((it) => !it.productName.trim())) { saveError = 'Tüm satırlarda ürün adı girilmeli.'; return; }
+		if (!userId || !companyId) { saveError = 'Oturum veya şirket bilgisi eksik.'; return null; }
+		if (items.some((it) => !it.productName.trim())) { saveError = 'Tüm satırlarda ürün adı girilmeli.'; return null; }
 
 		saving    = true;
 		saveError = '';
@@ -185,25 +224,27 @@
 					totalVat:          Math.round(totalVat * 100) / 100,
 					totalWithVat:      Math.round(totalWithVat * 100) / 100,
 					language,
-					...(deliveryType      && { deliveryType }),
-					...(deliveryFirm      && { deliveryFirm }),
-					...(deliveryPayment   && { deliveryPayment }),
-					...(deliveryAddress   && { deliveryAddress }),
-					...(deliveryCity      && { deliveryCity }),
-					...(deliveryCountry   && { deliveryCountry }),
-					...(installationType  && { installationType }),
-					...(paymentType       && { paymentType }),
-					...(estimatedDate     && { estimatedDeliveryDate: new Date(estimatedDate).getTime() }),
-					...(validUntilDate    && { validUntil: new Date(validUntilDate).getTime() }),
+					...(deliveryType       && { deliveryType }),
+					...(deliveryFirm       && { deliveryFirm }),
+					...(deliveryPayment    && { deliveryPayment }),
+					...(deliveryAddress    && { deliveryAddress }),
+					...(deliveryCity       && { deliveryCity }),
+					...(deliveryCountry    && { deliveryCountry }),
+					...(installationType   && { installationType }),
+					...(paymentType        && { paymentType }),
+					...(estimatedDate      && { estimatedDeliveryDate: new Date(estimatedDate).getTime() }),
+					...(validUntilDate     && { validUntil: new Date(validUntilDate).getTime() }),
 					...(productionDuration && { productionDuration }),
-					...(bankAccount       && { bankAccount }),
-					...(internalNotes     && { internalNotes }),
-					...(notes             && { notes }),
+					...(bankAccount        && { bankAccount }),
+					...(internalNotes      && { internalNotes }),
+					...(notes              && { notes }),
 					createdBy: userId,
 					createdAt: now
 				}),
 				tx.quotes[quoteId].link({ customer: customerId })
 			];
+
+			console.log('[QuoteForm] writing quoteItems:', items.map(it => ({ ...it })));
 
 			for (let i = 0; i < items.length; i++) {
 				const it     = items[i];
@@ -215,19 +256,20 @@
 				ops.push(
 					tx.quoteItems[itemId].update({
 						quoteId,
-						productId:       it.productId || undefined,
-						isIncludedPart:  it.isIncludedPart,
-						productName:     it.productName,
-						productSku:      it.productSku || undefined,
-						brandName:       it.brandName || undefined,
-						unit:            it.unit,
-						quantity:        it.quantity,
-						listPrice:       it.listPrice,
-						discountRate:    it.discountRate,
-						unitPrice:       Math.round(up * 100) / 100,
-						vatRate:         it.vatRate,
-						vatAmount:       Math.round(va * 100) / 100,
-						lineTotal:       Math.round(lt * 100) / 100,
+						companyId,
+						productId:        it.productId || undefined,
+						isIncludedPart:   it.isIncludedPart,
+						productName:      it.productName,
+						productSku:       it.productSku || undefined,
+						brandName:        it.brandName || undefined,
+						unit:             it.unit,
+						quantity:         it.quantity,
+						listPrice:        it.listPrice,
+						discountRate:     it.discountRate,
+						unitPrice:        Math.round(up * 100) / 100,
+						vatRate:          it.vatRate,
+						vatAmount:        Math.round(va * 100) / 100,
+						lineTotal:        Math.round(lt * 100) / 100,
 						lineTotalWithVat: Math.round((lt + va) * 100) / 100,
 						...(it.notes && { notes: it.notes }),
 						sortOrder: i
@@ -239,12 +281,205 @@
 				}
 			}
 
+			// Auto-create quote tracking task (same atomic transaction)
+			const autoTaskId = id();
+			ops.push(
+				tx.tasks[autoTaskId].update({
+					type:              'quote_tracking',
+					title:             `Teklif Takibi — ${customerName || 'Müşteri'} — ${quoteNumber}`,
+					status:            'pending',
+					quoteId,
+					assignedTo:        userId,
+					companyId,
+					relatedEntityType: 'quote',
+					relatedEntityId:   quoteId,
+					createdBy:         userId,
+					createdAt:         now,
+					dueAt:             now + 7 * 24 * 60 * 60 * 1000
+				})
+			);
+
+			// Activity feed kaydı
+			const actorName   = companyUsers.find((u) => u.userId === userId)?.fullName
+				?? authStore.userEmail?.split('@')[0]
+				?? 'Kullanıcı';
+			const actFeedId = id();
+			ops.push(
+				tx.activityFeed[actFeedId].update({
+					type:                'quote_created',
+					companyId,
+					actorId:             userId,
+					actorName,
+					description:         '1 teklif girdi',
+					relatedEntityType:   'quote',
+					relatedEntityId:     quoteId,
+					relatedEntityNumber: quoteNumber,
+					createdAt:           now
+				})
+			);
+
+			console.log('[QuoteForm] saveToDb:', { opsCount: ops.length, quoteId, autoTaskId, customerName });
 			await db.transact(ops);
-			onSaved();
+			console.log('[QuoteForm] saveToDb OK:', quoteId);
+			savedQuoteId     = quoteId;
+			savedQuoteNumber = quoteNumber;
+			return quoteId;
 		} catch {
 			saveError = 'Teklif kaydedilemedi. Lütfen tekrar deneyin.';
+			return null;
 		} finally {
 			saving = false;
+		}
+	}
+
+	async function save() {
+		const qid = await saveToDb();
+		if (qid) onSaved();
+	}
+
+	// ─── PDF ──────────────────────────────────────────────────────────────────────
+	// Turkish char normalizer for jsPDF standard fonts (helvetica is Latin-1 only)
+	function normTR(s: string): string {
+		return s
+			.replace(/ğ/g,'g').replace(/Ğ/g,'G').replace(/ş/g,'s').replace(/Ş/g,'S')
+			.replace(/ı/g,'i').replace(/İ/g,'I').replace(/ç/g,'c').replace(/Ç/g,'C')
+			.replace(/ö/g,'o').replace(/Ö/g,'O').replace(/ü/g,'u').replace(/Ü/g,'U');
+	}
+
+	async function downloadPdf() {
+		const { jsPDF } = await import('jspdf');
+		const currSym = currency === 'TRY' ? 'TL' : currency === 'USD' ? '$' : currency === 'EUR' ? '€' : currency;
+		const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+
+		const today = new Date().toLocaleDateString('tr-TR');
+		const qNum  = savedQuoteNumber || 'TASLAK';
+		const cName = normTR(customerName || 'Musteri');
+
+		// ── Header ────────────────────────────────────────────────
+		doc.setFontSize(20);
+		doc.setFont('helvetica', 'bold');
+		doc.text('TEKLIF', 105, 18, { align: 'center' });
+
+		doc.setFontSize(9);
+		doc.setFont('helvetica', 'normal');
+		doc.text(`Teklif No : ${normTR(qNum)}`, 20, 30);
+		doc.text(`Tarih     : ${today}`,          20, 36);
+		doc.text(`Musteri   : ${cName}`,           20, 42);
+
+		doc.setDrawColor(120, 120, 120);
+		doc.line(20, 47, 190, 47);
+
+		// ── Column headers ────────────────────────────────────────
+		let y = 54;
+		doc.setFillColor(40, 40, 40);
+		doc.rect(20, y - 5, 170, 7, 'F');
+		doc.setTextColor(255, 255, 255);
+		doc.setFontSize(8);
+		doc.setFont('helvetica', 'bold');
+		doc.text('Urun Adi',    22,  y);
+		doc.text('Miktar',      108, y);
+		doc.text('Birim Fiyat', 150, y, { align: 'right' });
+		doc.text('Toplam',      188, y, { align: 'right' });
+
+		y += 5;
+		doc.setTextColor(0, 0, 0);
+		doc.setFont('helvetica', 'normal');
+
+		// ── Item rows ─────────────────────────────────────────────
+		let rowAlt = false;
+		for (const it of items) {
+			const up  = it.listPrice * (1 - it.discountRate / 100);
+			const lt  = up * it.quantity;
+			const ltv = lt * (1 + it.vatRate / 100);
+
+			if (rowAlt) {
+				doc.setFillColor(246, 246, 246);
+				doc.rect(20, y, 170, 7, 'F');
+			}
+			rowAlt = !rowAlt;
+
+			const pname = normTR(it.productName || '—');
+			const truncated = pname.length > 45 ? pname.slice(0, 43) + '..' : pname;
+			const prefix = it.isIncludedPart ? '+ ' : '';
+
+			doc.setFontSize(8);
+			doc.text(`${prefix}${truncated}`, 22, y + 5);
+			doc.text(`${it.quantity} ${normTR(it.unit)}`, 108, y + 5);
+			doc.text(`${fmt(up)} ${currSym}`,  150, y + 5, { align: 'right' });
+			doc.text(`${fmt(ltv)} ${currSym}`, 188, y + 5, { align: 'right' });
+
+			y += 8;
+			if (y > 262) { doc.addPage(); y = 20; }
+		}
+
+		// ── Totals ────────────────────────────────────────────────
+		y += 3;
+		doc.setDrawColor(180, 180, 180);
+		doc.line(120, y, 190, y);
+		y += 6;
+
+		doc.setFontSize(9);
+		doc.text('Ara Toplam :', 130, y);
+		doc.text(`${fmt(subtotal)} ${currSym}`,      188, y, { align: 'right' });
+		y += 6;
+		doc.text('KDV :', 130, y);
+		doc.text(`${fmt(totalVat)} ${currSym}`,       188, y, { align: 'right' });
+		y += 8;
+		doc.setFont('helvetica', 'bold');
+		doc.setFontSize(10);
+		doc.text('GENEL TOPLAM :', 130, y);
+		doc.text(`${fmt(totalWithVat)} ${currSym}`, 188, y, { align: 'right' });
+
+		doc.save(`teklif-${normTR(qNum)}.pdf`);
+	}
+
+	// ─── Göreve Gönder ────────────────────────────────────────────────────────────
+	async function openGorevModal() {
+		let qid = savedQuoteId;
+		if (!qid) {
+			qid = await saveToDb() ?? '';
+			if (!qid) return;
+		}
+		taskTitle      = `Teklif Takibi — ${customerName} — ${savedQuoteNumber}`;
+		taskDesc       = '';
+		taskAssignedTo = authStore.userId ?? '';
+		taskDueDate    = '';
+		taskError      = '';
+		taskModalOpen  = true;
+	}
+
+	async function createTask() {
+		const userId = authStore.userId;
+		const cId    = authStore.activeCompanyId ?? companyId;
+		if (!userId || !cId) { taskError = 'Oturum bilgisi eksik.'; return; }
+		if (!taskTitle.trim()) { taskError = 'Başlık zorunludur.'; return; }
+		if (!taskAssignedTo)   { taskError = 'Atanacak kişi seçilmeli.'; return; }
+
+		taskSaving = true;
+		taskError  = '';
+		try {
+			const taskId = id();
+			await db.transact([
+				tx.tasks[taskId].update({
+					type:       'manual',
+					title:      taskTitle.trim(),
+					status:     'pending',
+					assignedTo: taskAssignedTo,
+					companyId:  cId,
+					quoteId:    savedQuoteId || undefined,
+					...(taskDesc.trim()  && { description: taskDesc.trim() }),
+					...(taskDueDate      && { dueAt: new Date(taskDueDate).getTime() }),
+					...(savedQuoteId     && { relatedEntityType: 'quote', relatedEntityId: savedQuoteId }),
+					createdBy:  userId,
+					createdAt:  Date.now()
+				})
+			]);
+			taskModalOpen = false;
+			onSaved();
+		} catch (err) {
+			taskError = err instanceof Error ? err.message : 'Görev kaydedilemedi.';
+		} finally {
+			taskSaving = false;
 		}
 	}
 
@@ -297,6 +532,37 @@
 				>
 					İptal
 				</button>
+
+				<!-- PDF İndir -->
+				<button
+					type="button"
+					onclick={downloadPdf}
+					class="flex items-center gap-1.5 rounded-full border border-[#2a2a2a] px-3 py-1.5 text-sm text-[#888] transition-colors hover:border-[#444] hover:text-white"
+					title="PDF olarak indir"
+				>
+					<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/>
+						<polyline points="7 10 12 15 17 10"/>
+						<line x1="12" y1="15" x2="12" y2="3"/>
+					</svg>
+					PDF İndir
+				</button>
+
+				<!-- Göreve Gönder -->
+				<button
+					type="button"
+					onclick={openGorevModal}
+					disabled={saving}
+					class="flex items-center gap-1.5 rounded-full border border-indigo-700 bg-indigo-900/30 px-3 py-1.5 text-sm text-indigo-300 transition-colors hover:bg-indigo-800/40 disabled:opacity-50"
+					title="Göreve gönder"
+				>
+					<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+						<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+					</svg>
+					Göreve Gönder
+				</button>
+
+				<!-- Taslak Kaydet -->
 				<button
 					type="button"
 					onclick={save}
@@ -327,7 +593,8 @@
 				{#each items as item, idx (item.tempId)}
 					<QuoteItemRow
 						bind:item={items[idx]}
-						groups={productGroups}
+						allProducts={allProducts}
+						companyId={companyId}
 						onRemove={() => removeItem(idx)}
 					/>
 				{/each}
@@ -611,3 +878,93 @@
 
 	</div>
 </div>
+
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<!-- GÖREVE GÖNDER MODAL                                                    -->
+<!-- ════════════════════════════════════════════════════════════════════════ -->
+<Modal
+	open={taskModalOpen}
+	title="Göreve Gönder"
+	width="480px"
+	onclose={() => (taskModalOpen = false)}
+>
+	<!-- Header -->
+	<div class="shrink-0 flex items-center justify-between border-b border-[#2a2a2a] px-5 py-4">
+		<div>
+			<h3 class="text-sm font-semibold text-white">Göreve Gönder</h3>
+			{#if savedQuoteNumber}
+				<p class="text-xs text-indigo-400 mt-0.5">{savedQuoteNumber}</p>
+			{/if}
+		</div>
+		<button
+			type="button"
+			aria-label="Kapat"
+			onclick={() => (taskModalOpen = false)}
+			class="text-gray-500 hover:text-white transition-colors text-lg leading-none"
+		>✕</button>
+	</div>
+
+	<!-- Body -->
+	<div class="p-5 flex flex-col gap-4">
+		{#if taskError}
+			<div class="rounded-lg border border-red-800 bg-red-950/50 px-3 py-2 text-xs text-red-400">{taskError}</div>
+		{/if}
+
+		<!-- Başlık (auto-filled, editable) -->
+		<div class="flex flex-col gap-1.5">
+			<label for="task-title" class="text-xs text-[#888]">Görev Başlığı *</label>
+			<input
+				id="task-title"
+				type="text"
+				bind:value={taskTitle}
+				class="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white
+					placeholder-[#555] outline-none focus:border-[#444]"
+			/>
+		</div>
+
+		<!-- Açıklama -->
+		<TextArea
+			label="Açıklama"
+			bind:value={taskDesc}
+			placeholder="Görev hakkında notlar..."
+			rows={3}
+		/>
+
+		<!-- Atanacak Kişi -->
+		<Select
+			label="Atanacak Kişi *"
+			bind:value={taskAssignedTo}
+			placeholder="Kişi seçin"
+			options={companyUsers.map((u) => ({ value: u.userId, label: u.fullName }))}
+		/>
+
+		<!-- Bitiş Tarihi -->
+		<div class="flex flex-col gap-1.5">
+			<label for="task-due" class="text-xs text-[#888]">Bitiş Tarihi</label>
+			<input
+				id="task-due"
+				type="date"
+				bind:value={taskDueDate}
+				class="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-3 py-2 text-sm text-white
+					outline-none focus:border-[#444]"
+			/>
+		</div>
+	</div>
+
+	<!-- Footer -->
+	<div class="shrink-0 flex justify-end gap-2 border-t border-[#2a2a2a] px-5 py-3">
+		<button
+			type="button"
+			onclick={() => (taskModalOpen = false)}
+			class="px-4 py-2 rounded-xl border border-[#2a2a2a] text-sm text-gray-400
+				hover:bg-[#1a1a1a] hover:text-white transition-colors"
+		>İptal</button>
+		<button
+			type="button"
+			onclick={createTask}
+			disabled={taskSaving}
+			class="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium
+				hover:bg-indigo-500 transition-colors disabled:opacity-50"
+		>{taskSaving ? 'Kaydediliyor…' : 'Görevi Oluştur'}</button>
+	</div>
+</Modal>

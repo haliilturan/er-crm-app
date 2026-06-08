@@ -8,7 +8,8 @@
 		date = '',
 		status = 'pending',
 		relatedEntityType = '',
-		relatedEntityName = ''
+		relatedEntityName = '',
+		quoteId = ''
 	}: {
 		taskId: string;
 		title: string;
@@ -17,6 +18,7 @@
 		status?: 'pending' | 'overdue' | 'done' | 'dismissed';
 		relatedEntityType?: string;
 		relatedEntityName?: string;
+		quoteId?: string;
 	} = $props();
 
 	let expanded = $state(false);
@@ -37,9 +39,17 @@
 	);
 
 	const barColor = $derived(
-		status === 'done'      ? 'bg-green-500' :
+		status === 'done'      ? 'bg-green-500'  :
 		status === 'overdue'   ? 'bg-orange-500' :
-		status === 'dismissed' ? 'bg-[#555]'    : 'bg-red-500'
+		status === 'dismissed' ? 'bg-[#555]'     : 'bg-red-500'
+	);
+
+	const cardBg = $derived(
+		status === 'done'
+			? 'bg-green-950/50 border border-green-900/40 hover:bg-green-950/70'
+			: status === 'dismissed'
+				? 'bg-[#1a1a1a] opacity-50 hover:bg-[#222]'
+				: 'bg-[#1a1a1a] hover:bg-[#222]'
 	);
 
 	const displayTitle = $derived(title?.trim() || '(Başlıksız)');
@@ -56,9 +66,7 @@
 </script>
 
 <div
-	class="relative flex gap-3 pl-4 pr-3 py-3 rounded-2xl cursor-pointer transition-colors
-		bg-[#1a1a1a] hover:bg-[#222]
-		{status === 'done' || status === 'dismissed' ? 'opacity-60' : ''}"
+	class="relative flex gap-3 pl-4 pr-3 py-3 rounded-2xl cursor-pointer transition-colors {cardBg}"
 	role="button"
 	tabindex="0"
 	onclick={() => (expanded = !expanded)}
@@ -95,12 +103,20 @@
 	<div class="flex-1 min-w-0">
 		<!-- Collapsed header row -->
 		<div class="flex items-start justify-between gap-2">
-			<p class="text-sm font-medium text-white leading-tight {expanded ? 'font-bold' : ''}">{displayTitle}</p>
+			<p class="text-sm font-medium leading-tight
+				{status === 'done' ? 'line-through text-green-400/80' : 'text-white'}
+				{expanded ? 'font-bold' : ''}">{displayTitle}</p>
 			<span class="text-xs text-[#555] shrink-0 whitespace-nowrap">{date}</span>
 		</div>
 
 		{#if description}
 			<p class="text-xs text-[#888] mt-0.5 leading-tight {expanded ? '' : 'truncate'}">{description}</p>
+		{/if}
+
+		{#if quoteId}
+			<span class="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-indigo-950/70 text-indigo-300 border border-indigo-800/40">
+				Teklif
+			</span>
 		{/if}
 
 		<!-- Expanded extras -->

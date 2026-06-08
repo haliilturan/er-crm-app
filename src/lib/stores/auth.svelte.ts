@@ -1,4 +1,4 @@
-import { db } from '$lib/instant';
+import { db, id, tx } from '$lib/instant';
 
 export interface CompanyInfo {
 	id: string;
@@ -17,6 +17,29 @@ let _filter    = $state<string | 'all'>('all');
 let _unsubAuth:      (() => void) | null = null;
 let _unsubCompanies: (() => void) | null = null;
 
+async function ensureProfile(uid: string, email: string): Promise<void> {
+	try {
+		const result = await db.queryOnce({
+			userProfiles: { $: { where: { email } } }
+		});
+		if ((result.data?.userProfiles ?? []).length > 0) return;
+
+		const profileId = id();
+		await db.transact([
+			tx.userProfiles[profileId]
+				.update({
+					email,
+					fullName: email.split('@')[0],
+					userId:   uid,
+					createdAt: Date.now()
+				})
+				.link({ user: uid })
+		]);
+	} catch (err) {
+		console.error('[ensureProfile] error:', err);
+	}
+}
+
 export const authStore = {
 	get userId():    string | null  { return _userId; },
 	get userEmail(): string | null  { return _userEmail; },
@@ -24,7 +47,8 @@ export const authStore = {
 	get companies(): CompanyInfo[]  { return _companies; },
 	get companyIds(): string[]      { return _companies.map((c) => c.id); },
 	get activeFilter(): string | 'all' { return _filter; },
-	get isAdmin(): boolean { return _companies.some((c) => c.role === 'admin'); },
+	get isAdmin():  boolean { return _companies.some((c) => c.role === 'admin'); },
+	get isFinans(): boolean { return _companies.some((c) => c.role === 'finans' || c.role === 'admin'); },
 
 	/** Sorgu yazarken kullanılacak şirket ID'si (filtre seçiliyse o, yoksa ilk) */
 	get activeCompanyId(): string | null {
@@ -35,10 +59,13 @@ export const authStore = {
 	init(): void {
 		if (_unsubAuth) return;
 		_unsubAuth = db.subscribeAuth((state) => {
-			const uid = state.user?.id ?? null;
+			const uid   = state.user?.id ?? null;
+			const email = state.user?.email ?? null;
 			_userId    = uid;
-			_userEmail = state.user?.email ?? null;
+			_userEmail = email;
 			_ready     = true;
+
+			if (uid && email) ensureProfile(uid, email);
 
 			if (!uid) {
 				_companies = [];

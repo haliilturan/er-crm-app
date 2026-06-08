@@ -27,6 +27,8 @@ const schema = i.schema({
 		userProfiles: i.entity({
 			email: i.string().unique().indexed(),
 			fullName: i.string().indexed(),
+			// $users entity ID — izin traversal gerektirmeden filtreleme için
+			userId: i.string().optional().indexed(),
 			photoUrl: i.string().optional(),
 			phone: i.string().optional(),
 			createdAt: i.number(),
@@ -118,8 +120,15 @@ const schema = i.schema({
 			name: i.string().indexed(),
 			nameSearch: i.string().indexed(),
 			sku: i.string().unique(),
-			brandId: i.string().indexed(),
 			companyId: i.string().indexed(),
+			detail: i.string().optional(),
+			code: i.string().optional(),
+			serialNo: i.string().optional(),
+			firm: i.string().optional(),
+			diameter: i.number().optional(),
+			unitPrice: i.number().optional(),
+			currency: i.string().optional(),
+			isManual: i.boolean().optional(),
 			category: i.string().indexed(),
 			applicationArea: i.string().optional(),
 			// "ready" | "custom"
@@ -161,12 +170,15 @@ const schema = i.schema({
 			name: i.string().indexed(),
 			nameSearch: i.string().indexed(),
 			sku: i.string().optional(),
-			brandId: i.string().indexed(),
+			serialNo: i.string().optional(),
+			firm: i.string().optional(),
+			brandId: i.string().optional().indexed(),
 			companyId: i.string().indexed(),
 			category: i.string().optional(),
 			applicationArea: i.string().optional(),
 			// "ready" | "custom"
 			type: i.string().indexed(),
+			isCustom: i.boolean().optional(),
 			// "draft" | "review" | "approved" | "rejected"
 			status: i.string().indexed(),
 			description: i.string().optional(),
@@ -174,6 +186,9 @@ const schema = i.schema({
 			// string[]
 			photoUrls: i.json().optional(),
 			technicalDrawingUrl: i.string().optional(),
+			// base64 encoded
+			photo: i.string().optional(),
+			technicalDrawing: i.string().optional(),
 			basePrice: i.number().optional(),
 			vatRate: i.number().optional(),
 			unit: i.string().optional(),
@@ -190,6 +205,8 @@ const schema = i.schema({
 		productDraftParts: i.entity({
 			productDraftId: i.string().indexed(),
 			name: i.string(),
+			// "ready" | "custom"
+			partType: i.string().optional(),
 			quantity: i.number(),
 			isGift: i.boolean(),
 			notes: i.string().optional(),
@@ -240,6 +257,10 @@ const schema = i.schema({
 			bankAccount:        i.string().optional(),
 			// Üretim süresi (serbest metin, örn: "4-6 hafta")
 			productionDuration: i.string().optional(),
+			// Finans onayı — "pending" | "approved" | "rejected"
+			financeStatus:       i.string().optional().indexed(),
+			financeApprovedAt:   i.number().optional(),
+			financeApprovedBy:   i.string().optional(),
 			createdBy: i.string(),
 			createdAt: i.number().indexed(),
 			updatedBy: i.string().optional(),
@@ -252,6 +273,7 @@ const schema = i.schema({
 		 */
 		quoteItems: i.entity({
 			quoteId: i.string().indexed(),
+			companyId: i.string().indexed(),
 			// Custom item'larda null olabilir
 			productId: i.string().optional(),
 			// Eşantiyon satırı için üst satır ID'si
@@ -298,8 +320,11 @@ const schema = i.schema({
 			quoteId: i.string().indexed(),
 			customerId: i.string().indexed(),
 			companyId: i.string().indexed(),
-			// "pending_production" | "in_production" | "ready" | "shipped" | "delivered" | "cancelled"
+			customerName: i.string().optional(),
+			// "active" | "completed" | "cancelled"
 			status: i.string().indexed(),
+			// "unpaid" | "partial" | "paid"
+			paymentStatus: i.string().optional().indexed(),
 			currency: i.string(),
 			subtotal: i.number(),
 			totalVat: i.number(),
@@ -310,8 +335,8 @@ const schema = i.schema({
 			deliveryCity: i.string().optional(),
 			deliveryCountry: i.string().optional(),
 			notes: i.string().optional(),
-			approvedBy: i.string(),
-			approvedAt: i.number(),
+			approvedBy: i.string().optional(),
+			approvedAt: i.number().optional(),
 			createdBy: i.string(),
 			createdAt: i.number().indexed(),
 			updatedBy: i.string().optional(),
@@ -324,6 +349,7 @@ const schema = i.schema({
 		 */
 		orderItems: i.entity({
 			orderId: i.string().indexed(),
+			companyId: i.string().indexed(),
 			productId: i.string().optional(),
 			parentItemId: i.string().optional(),
 			isIncludedPart: i.boolean(),
@@ -367,6 +393,8 @@ const schema = i.schema({
 			relatedEntityId: i.string(),
 			// Örn: "HF-2025-0001"
 			relatedEntityNumber: i.string().optional(),
+			// İnsan okunabilir eylem açıklaması — "1 teklif girdi", "1 sipariş oluşturdu"
+			description: i.string().optional(),
 			amount: i.number().optional(),
 			currency: i.string().optional(),
 			brandId: i.string().optional(),
@@ -381,21 +409,71 @@ const schema = i.schema({
 		 * Status geçişlerinde otomatik, aynı transaction içinde yazılır.
 		 */
 		tasks: i.entity({
-			// "quote_submitted" | "quote_approved" | "quote_rejected" | "order_created"
+			// "quote_submitted" | "quote_approved" | "quote_rejected" | "order_created" | "quote_tracking" | "manual"
 			type: i.string().indexed(),
 			title: i.string(),
 			description: i.string().optional(),
 			// "quote" | "order" | "customer"
 			relatedEntityType: i.string().optional(),
 			relatedEntityId: i.string().optional(),
+			quoteId: i.string().optional(),
 			assignedTo: i.string().indexed(),
 			companyId: i.string().indexed(),
 			// "pending" | "done" | "dismissed"
 			status: i.string().indexed(),
 			dueAt: i.number().optional(),
+			completedAt: i.number().optional(),
 			createdBy: i.string(),
 			createdAt: i.number().indexed(),
 			updatedAt: i.number().optional()
+		}),
+
+		// ─── Mesajlaşma ───────────────────────────────────────────────────────────
+
+		/**
+		 * Kullanıcılar arası direkt mesajlar.
+		 * senderId / receiverId: $users entity ID'leri (auth.id ile eşleşir).
+		 */
+		messages: i.entity({
+			senderId:   i.string().indexed(),
+			receiverId: i.string().indexed(),
+			content:    i.string(),
+			createdAt:  i.number().indexed(),
+			readAt:     i.number().optional(),
+			companyId:  i.string().indexed()
+		}),
+
+		// ─── Bildirimler ─────────────────────────────────────────────────────────
+
+		/**
+		 * Kullanıcıya özel bildirimler (yeni mesaj, görev, sistem).
+		 * userId: alıcı $users ID'si.
+		 */
+		notifications: i.entity({
+			userId:    i.string().indexed(),
+			type:      i.string().indexed(),
+			title:     i.string(),
+			body:      i.string(),
+			entityId:  i.string().optional().indexed(),
+			actorName: i.string().optional(),
+			companyId: i.string().optional().indexed(),
+			readAt:    i.number().optional(),
+			createdAt: i.number().indexed()
+		}),
+
+		// ─── Ödemeler ─────────────────────────────────────────────────────────────
+
+		payments: i.entity({
+			orderId:      i.string().indexed(),
+			customerId:   i.string().indexed(),
+			customerName: i.string(),
+			companyId:    i.string().indexed(),
+			amount:       i.number(),
+			currency:     i.string(),
+			paidAt:       i.number().indexed(),
+			note:         i.string().optional(),
+			recordedBy:   i.string(),
+			createdAt:    i.number().indexed()
 		})
 	},
 
@@ -439,10 +517,6 @@ const schema = i.schema({
 		brandOrg: {
 			forward: { on: 'brands', has: 'one', label: 'company' },
 			reverse: { on: 'companies', has: 'many', label: 'brands' }
-		},
-		productBrand: {
-			forward: { on: 'products', has: 'one', label: 'brand' },
-			reverse: { on: 'brands', has: 'many', label: 'products' }
 		},
 		productPartProduct: {
 			forward: { on: 'productParts', has: 'one', label: 'product' },
@@ -525,6 +599,13 @@ const schema = i.schema({
 		taskAssignee: {
 			forward: { on: 'tasks', has: 'one', label: 'assignee' },
 			reverse: { on: 'userProfiles', has: 'many', label: 'assignedTasks' }
+		},
+
+		// ─── Ödemeler ────────────────────────────────────────────────────────────
+
+		paymentOrder: {
+			forward: { on: 'payments', has: 'one', label: 'order' },
+			reverse: { on: 'orders', has: 'many', label: 'payments' }
 		}
 	}
 });

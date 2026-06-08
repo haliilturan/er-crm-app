@@ -58,10 +58,12 @@ const rules = {
 		bind: {
 			isOwnMembership: 'auth.id != null && data.userId == auth.id',
 			isAnyAdmin:
-				"auth.id != null && 'admin' in auth.ref('$user.profile.companyMemberships.role')"
+				"auth.id != null && 'admin' in auth.ref('$user.profile.companyMemberships.role')",
+			isInSameCompany:
+				"auth.id != null && data.companyId in auth.ref('$user.profile.companyMemberships.companyId')"
 		},
 		allow: {
-			view: 'isOwnMembership || isAnyAdmin',
+			view: 'isOwnMembership || isAnyAdmin || isInSameCompany',
 			create: 'auth.id != null',
 			update: 'isAnyAdmin',
 			delete: 'isAnyAdmin'
@@ -94,7 +96,7 @@ const rules = {
 			isOwner: 'data.createdBy == auth.id'
 		},
 		allow: {
-			view: 'inCompany && (isAssigned || isAdmin)',
+			view:   'auth.id != null',
 			create: 'auth.id != null && data.createdBy == auth.id',
 			update: 'inCompany && (isAssigned || isOwner || isAdmin)',
 			delete: 'inCompany && isAdmin'
@@ -134,17 +136,11 @@ const rules = {
 	},
 
 	products: {
-		bind: {
-			inCompany:
-				"auth.id != null && data.companyId in auth.ref('$user.profile.companyMemberships.companyId')",
-			isAdmin: "'admin' in auth.ref('$user.profile.companyMemberships.role')",
-			isOwner: 'data.createdBy == auth.id'
-		},
 		allow: {
-			view: 'inCompany',
-			create: 'auth.id != null && data.createdBy == auth.id',
-			update: 'inCompany && (isOwner || isAdmin)',
-			delete: 'inCompany && isAdmin'
+			view:   'auth.id != null',
+			create: 'auth.id != null',
+			update: 'auth.id != null',
+			delete: 'auth.id != null'
 		}
 	},
 
@@ -204,13 +200,14 @@ const rules = {
 			inCompany:
 				"auth.id != null && data.companyId in auth.ref('$user.profile.companyMemberships.companyId')",
 			isAdmin: "'admin' in auth.ref('$user.profile.companyMemberships.role')",
+			isFinans: "auth.id != null && 'finans' in auth.ref('$user.profile.companyMemberships.role')",
 			isAssigned: 'data.assignedTo == auth.id',
 			isOwner: 'data.createdBy == auth.id'
 		},
 		allow: {
-			view: 'inCompany && (isAssigned || isAdmin)',
+			view:   'inCompany && (isAssigned || isAdmin || isFinans)',
 			create: 'auth.id != null && data.createdBy == auth.id',
-			update: 'inCompany && (isAssigned || isOwner || isAdmin)',
+			update: 'inCompany && (isAssigned || isOwner || isAdmin || isFinans)',
 			delete: 'inCompany && isAdmin'
 		}
 	},
@@ -225,7 +222,7 @@ const rules = {
 			isQuoteOwner: "auth.id != null && data.ref('quote.createdBy') == auth.id"
 		},
 		allow: {
-			view: 'inCompany && (isQuoteAssignee || isAdmin)',
+			view: 'auth.id != null',
 			create: 'auth.id != null',
 			update: 'inCompany && (isQuoteAssignee || isQuoteOwner || isAdmin)',
 			delete: 'inCompany && (isQuoteAssignee || isQuoteOwner || isAdmin)'
@@ -255,13 +252,14 @@ const rules = {
 			inCompany:
 				"auth.id != null && data.companyId in auth.ref('$user.profile.companyMemberships.companyId')",
 			isAdmin: "'admin' in auth.ref('$user.profile.companyMemberships.role')",
+			isFinans: "auth.id != null && 'finans' in auth.ref('$user.profile.companyMemberships.role')",
 			isSourceQuoteAssignee:
 				"auth.id != null && data.ref('sourceQuote.assignedTo') == auth.id"
 		},
 		allow: {
-			view: 'inCompany && (isSourceQuoteAssignee || isAdmin)',
-			create: 'auth.id != null && data.createdBy == auth.id',
-			update: 'inCompany && isAdmin',
+			view:   'inCompany && (isSourceQuoteAssignee || isAdmin || isFinans)',
+			create: 'auth.id != null',
+			update: 'inCompany && (isAdmin || isFinans)',
 			delete: 'false'
 		}
 	},
@@ -276,7 +274,7 @@ const rules = {
 				"auth.id != null && data.ref('order.sourceQuote.assignedTo') == auth.id"
 		},
 		allow: {
-			view: 'inCompany && (isSourceQuoteAssignee || isAdmin)',
+			view: 'auth.id != null',
 			create: 'auth.id != null',
 			update: 'inCompany && isAdmin',
 			delete: 'false'
@@ -286,12 +284,8 @@ const rules = {
 	// ─── Cross-Module ─────────────────────────────────────────────────────────────
 
 	activityFeed: {
-		bind: {
-			inCompany:
-				"auth.id != null && data.companyId in auth.ref('$user.profile.companyMemberships.companyId')"
-		},
 		allow: {
-			view: 'inCompany',
+			view:   'auth.id != null',
 			create: 'auth.id != null && data.actorId == auth.id',
 			update: 'false',
 			delete: 'false'
@@ -311,6 +305,47 @@ const rules = {
 			create: 'auth.id != null && data.createdBy == auth.id',
 			update: 'isAssigned || isAdmin',
 			delete: 'isAdmin'
+		}
+	},
+
+	// ─── Mesajlaşma ───────────────────────────────────────────────────────────────
+
+	messages: {
+		allow: {
+			view:   "auth.id != null && (data.senderId == auth.id || data.receiverId == auth.id)",
+			create: "auth.id != null && data.senderId == auth.id",
+			update: "auth.id != null && data.receiverId == auth.id",
+			delete: "false"
+		}
+	},
+
+	// ─── Bildirimler ─────────────────────────────────────────────────────────────
+
+	notifications: {
+		allow: {
+			view:   'auth.id != null && data.userId == auth.id',
+			create: 'auth.id != null',
+			update: 'auth.id != null && data.userId == auth.id',
+			delete: 'false'
+		}
+	},
+
+	// ─── Ödemeler ─────────────────────────────────────────────────────────────────
+
+	payments: {
+		bind: {
+			inCompany:
+				"auth.id != null && data.companyId in auth.ref('$user.profile.companyMemberships.companyId')",
+			isAdmin:
+				"auth.id != null && 'admin' in auth.ref('$user.profile.companyMemberships.role')",
+			isFinans:
+				"auth.id != null && 'finans' in auth.ref('$user.profile.companyMemberships.role')"
+		},
+		allow: {
+			view:   'inCompany',
+			create: 'auth.id != null',
+			update: 'inCompany && (isFinans || isAdmin)',
+			delete: 'inCompany && isAdmin'
 		}
 	}
 } satisfies InstantRules<AppSchema>;
