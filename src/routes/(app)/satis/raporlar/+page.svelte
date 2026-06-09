@@ -45,6 +45,7 @@
 	let pdfModal         = $state(false);
 	let pdfLang          = $state<Lang>('tr');
 	let pdfExporting     = $state(false);
+	let pdfLoadingFont   = $state(false);
 	let quotes           = $state<Quote[]>([]);
 	let orders           = $state<Order[]>([]);
 	let profiles         = $state<UserProfile[]>([]);
@@ -287,29 +288,28 @@
 		ru: {
 			title: 'Отчёт о продажах', period: 'Период', exportDate: 'Дата экспорта',
 			stats: 'Статистика', metric: 'Метрика', value: 'Значение',
-			fields: ['Всего предложений','Всего заказов','Сумма предложений (TL)','Сумма заказов (TL)','Конверсия (%)','Sr. сумма предложения'],
-			targetSection: 'Ежемесячный план',
-			targetLabel: 'Ежемесячный план', achievedUsd: 'Выполнено (USD)', achievedTl: 'Выполнено (TL)', remaining: 'Остаток', remainingSuffix: 'ОСТАЛОСЬ',
+			fields: ['Всего предложений','Всего заказов','Сумма предложений (TL)','Сумма заказов (TL)','Конверсия (%)','Ср. сумма предложения'],
+			targetSection: 'Ежемесячная цель продаж',
+			targetLabel: 'Ежемесячная цель', achievedUsd: 'Выполнено (USD)', achievedTl: 'Выполнено (TL)', remaining: 'Остаток', remainingSuffix: 'ОСТАЛОСЬ',
 			chartsTitle: 'Графики', barChartTitle: 'Предложения / Заказы', lineChartTitle: 'Динамика сумм',
-			detail: 'Детали предложений', date: 'Дата', customer: 'Клиент', quote: '№ предложения', amount: 'Сумма', status: 'Статус',
+			detail: 'Детали предложений', date: 'Дата', customer: 'Клиент', quote: '№ предложения', amount: 'Итого', status: 'Статус',
 			noData: 'Данные за этот период не найдены.',
 			periodLabels: { daily: 'Ежедневно', weekly: 'Еженедельно', monthly: 'Ежемесячно', yearly: 'Ежегодно' },
 			colPeriod: 'Период', colQuotes: 'Предложения', colOrders: 'Заказы',
 			rtl: false
 		},
 		ar: {
-			// Arabic script requires NotoSansArabic font + bidi shaping; using transliteration as fallback
-			title: 'Taqrir al-Mabiyat', period: 'Al-Fatra', exportDate: 'Tarikh al-Tasdir',
-			stats: 'Al-Ihsaiyat', metric: 'Al-Miqyas', value: 'Al-Qima',
-			fields: ['Ijmali al-Urud','Ijmali al-Talab','Mablagh al-Urud (TL)','Mablagh al-Talab (TL)','Maadal al-Tahwil (%)','Mutawasat al-Ard'],
-			targetSection: 'Al-Hadaf al-Shahri',
-			targetLabel: 'Al-Hadaf al-Shahri', achievedUsd: 'Al-Munjaz (USD)', achievedTl: 'Al-Munjaz (TL)', remaining: 'Al-Mutabaqqi', remainingSuffix: 'MUTABAQQI',
-			chartsTitle: 'Al-Rusum al-Bayaniya', barChartTitle: 'Adad al-Urud / al-Talab', lineChartTitle: 'Ittijah al-Mablagh',
-			detail: 'Tafasil al-Urud', date: 'Al-Tarikh', customer: 'Al-Amil', quote: 'Raqm al-Ard', amount: 'Al-Mablagh', status: 'Al-Hala',
-			noData: 'La bayanat li-hadhihi al-fatra.',
-			periodLabels: { daily: 'Yawmi', weekly: 'Usbuyi', monthly: 'Shahri', yearly: 'Sanawi' },
-			colPeriod: 'Al-Fatra', colQuotes: 'Al-Urud', colOrders: 'Al-Talab',
-			rtl: false
+			title: 'تقرير المبيعات', period: 'الفترة', exportDate: 'تاريخ التصدير',
+			stats: 'الإحصائيات', metric: 'المقياس', value: 'القيمة',
+			fields: ['إجمالي العروض','إجمالي الطلبات','مبلغ العروض (TL)','مبلغ الطلبات (TL)','معدل التحويل (%)','متوسط مبلغ العرض'],
+			targetSection: 'الهدف الشهري للمبيعات',
+			targetLabel: 'الهدف الشهري', achievedUsd: 'المحقق (USD)', achievedTl: 'المحقق (TL)', remaining: 'المتبقي', remainingSuffix: 'متبقي',
+			chartsTitle: 'الرسوم البيانية', barChartTitle: 'عدد العروض / الطلبات', lineChartTitle: 'اتجاه المبلغ',
+			detail: 'تفاصيل العروض', date: 'التاريخ', customer: 'العميل', quote: 'رقم العرض', amount: 'المبلغ', status: 'الحالة',
+			noData: 'لا توجد بيانات لهذه الفترة.',
+			periodLabels: { daily: 'يومي', weekly: 'أسبوعي', monthly: 'شهري', yearly: 'سنوي' },
+			colPeriod: 'الفترة', colQuotes: 'العروض', colOrders: 'الطلبات',
+			rtl: true
 		},
 		fr: {
 			title: 'Rapport de Ventes', period: 'Période', exportDate: "Date d'export",
@@ -326,29 +326,33 @@
 		}
 	} as const;
 
-	// ── NotoSans font loader (covers Latin-Ext + Cyrillic → TR, RU, FR, EN) ────
-	async function loadNotoSansFont(): Promise<string | null> {
-		const FONT_URLS = [
-			'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/notosans/NotoSans-Regular.ttf',
-			'https://cdn.jsdelivr.net/gh/google/fonts@main/apache/notosans/static/NotoSans-Regular.ttf',
-			'/fonts/NotoSans-Regular.ttf'
-		];
-		for (const url of FONT_URLS) {
-			try {
-				const res = await fetch(url);
-				if (!res.ok) continue;
-				const buf = await res.arrayBuffer();
-				const bytes = new Uint8Array(buf);
-				let binary = '';
-				for (let i = 0; i < bytes.length; i++) {
-					binary += String.fromCharCode(bytes[i]);
-				}
-				return btoa(binary);
-			} catch {
-				continue;
-			}
+	// ── Font loaders ─────────────────────────────────────────────────────────
+	// Fetches font binary and converts to base64 for jsPDF embedding.
+	// Uses loop-based conversion (avoids stack overflow on large files).
+	async function fetchFontBase64(url: string): Promise<string | null> {
+		try {
+			const res = await fetch(url);
+			if (!res.ok) return null;
+			const buf = await res.arrayBuffer();
+			const bytes = new Uint8Array(buf);
+			let binary = '';
+			for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+			return btoa(binary);
+		} catch {
+			return null;
 		}
-		return null;
+	}
+
+	async function loadFonts(): Promise<{ latinBase64: string | null; arabicBase64: string | null }> {
+		const [latinBase64, arabicBase64] = await Promise.all([
+			// NotoSans — Latin Extended + Cyrillic (TR, EN, RU, FR)
+			// Try @fontsource WOFF first; fall back to Google Fonts TTF
+			fetchFontBase64('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans/files/noto-sans-all-400-normal.woff')
+				.then(r => r ?? fetchFontBase64('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/notosans/NotoSans-Regular.ttf')),
+			// NotoSansArabic — Arabic script (AR)
+			fetchFontBase64('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-arabic/files/noto-sans-arabic-all-400-normal.woff')
+		]);
+		return { latinBase64, arabicBase64 };
 	}
 
 	// ── Chart capture (SVG → canvas → dataURL) ─────────────────────────────────
@@ -384,39 +388,69 @@
 
 	// ── PDF export ─────────────────────────────────────────────────────────────
 	async function exportPdf() {
-		pdfExporting = true;
+		pdfExporting    = true;
+		pdfLoadingFont  = true;
 		try {
-			const [{ jsPDF }, fontBase64] = await Promise.all([
+			const [{ jsPDF }, fonts] = await Promise.all([
 				import('jspdf'),
-				loadNotoSansFont()
+				loadFonts()
 			]);
+			pdfLoadingFont = false;
+
 			// A4 landscape: 297 × 210 mm
 			const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
+			const { latinBase64, arabicBase64 } = fonts;
 
-			// Embed NotoSans for full Unicode support (TR, RU, FR special chars)
-			if (fontBase64) {
-				doc.addFileToVFS('NotoSans-Regular.ttf', fontBase64);
-				doc.addFont('NotoSans-Regular.ttf', 'NotoSans', 'normal');
-				doc.setFont('NotoSans', 'normal');
+			// Register fonts
+			if (latinBase64) {
+				doc.addFileToVFS('NotoSans.ttf', latinBase64);
+				doc.addFont('NotoSans.ttf', 'NotoSans', 'normal');
+			}
+			if (arabicBase64) {
+				doc.addFileToVFS('NotoSansArabic.ttf', arabicBase64);
+				doc.addFont('NotoSansArabic.ttf', 'NotoSansArabic', 'normal');
 			}
 
-			const L = LANGS[pdfLang];
-			const company = authStore.companies[0];
+			const L       = LANGS[pdfLang];
+			const PAGE_W  = 297; // landscape A4 width in mm
+			const isRTL   = L.rtl;
+
+			// Re-apply correct font after addPage() calls
+			function setFnt() {
+				if (pdfLang === 'ar' && arabicBase64)   doc.setFont('NotoSansArabic', 'normal');
+				else if (latinBase64)                    doc.setFont('NotoSans', 'normal');
+			}
+			setFnt();
+
+			// RTL-aware text: mirrors x and forces align:'right' for Arabic
+			function txt(s: string, x: number, y: number, o?: Record<string, any>) {
+				if (isRTL) doc.text(s, PAGE_W - x, y, { ...(o ?? {}), align: 'right' });
+				else       doc.text(s, x, y, o);
+			}
+
+			// RTL-aware rect: mirrors x origin so panel sides swap
+			function rct(x: number, y: number, w: number, h: number, s: string) {
+				doc.rect(isRTL ? PAGE_W - x - w : x, y, w, h, s as any);
+			}
+
+			// RTL-aware image
+			function addImg(d: string, f: string, x: number, y: number, w: number, h: number) {
+				doc.addImage(d, f, isRTL ? PAGE_W - x - w : x, y, w, h);
+			}
+
+			const company     = authStore.companies[0];
 			const companyName = company?.name ?? '';
 
 			// ── A) Header ──────────────────────────────────────────────────────
 			doc.setFillColor(17, 17, 17);
-			doc.rect(0, 0, 297, 48, 'F');
+			doc.rect(0, 0, PAGE_W, 48, 'F');
 
-			// Logo
 			let logoAdded = false;
 			if (company?.logoUrl) {
 				const logoData = await fetchLogoBase64(company.logoUrl);
 				if (logoData) {
-					try {
-						doc.addImage(logoData, 'PNG', 14, 8, 24, 24);
-						logoAdded = true;
-					} catch { /* skip */ }
+					try { addImg(logoData, 'PNG', 14, 8, 24, 24); logoAdded = true; }
+					catch { /* skip */ }
 				}
 			}
 			const textX = logoAdded ? 42 : 14;
@@ -424,32 +458,31 @@
 			doc.setFontSize(18);
 			doc.setTextColor(255, 255, 255);
 			if (companyName) {
-				doc.text(companyName, textX, 20);
+				txt(companyName, textX, 20);
 				doc.setFontSize(11);
 				doc.setTextColor(160, 160, 160);
-				doc.text(L.title, textX, 29);
+				txt(L.title, textX, 29);
 			} else {
-				doc.text(L.title, textX, 22);
+				txt(L.title, textX, 22);
 			}
-
 			doc.setFontSize(9);
 			doc.setTextColor(130, 130, 130);
-			doc.text(`${L.period}: ${L.periodLabels[period]}  |  ${fmtDate(periodStart)} - ${fmtDate(Date.now())}`, textX, 37);
-			doc.text(`${L.exportDate}: ${fmtDate(Date.now())}`, textX, 44);
+			txt(`${L.period}: ${L.periodLabels[period]}  |  ${fmtDate(periodStart)} - ${fmtDate(Date.now())}`, textX, 37);
+			txt(`${L.exportDate}: ${fmtDate(Date.now())}`, textX, 44);
 
-			// ── B) Stats table (left column, x: 14–143) ────────────────────────
+			// ── B) Stats table (left column LTR / right column RTL, x: 14–143) ─
 			let y = 56;
 			doc.setFontSize(11);
 			doc.setTextColor(30, 30, 30);
-			doc.text(L.stats, 14, y);
+			txt(L.stats, 14, y);
 			y += 5;
 
 			doc.setFillColor(37, 99, 235);
-			doc.rect(14, y, 129, 7, 'F');
+			rct(14, y, 129, 7, 'F');
 			doc.setFontSize(8.5);
 			doc.setTextColor(255, 255, 255);
-			doc.text(L.metric, 16, y + 5);
-			doc.text(L.value, 108, y + 5);
+			txt(L.metric, 16, y + 5);
+			txt(L.value,  108, y + 5);
 			y += 9;
 
 			const statValues = [
@@ -462,14 +495,11 @@
 			];
 
 			L.fields.forEach((field, i) => {
-				if (i % 2 === 0) {
-					doc.setFillColor(245, 245, 250);
-					doc.rect(14, y - 4, 129, 7, 'F');
-				}
+				if (i % 2 === 0) { doc.setFillColor(245, 245, 250); rct(14, y - 4, 129, 7, 'F'); }
 				doc.setFontSize(8);
 				doc.setTextColor(30, 30, 30);
-				doc.text(field, 16, y);
-				doc.text(statValues[i], 108, y);
+				txt(field,        16,  y);
+				txt(statValues[i], 108, y);
 				y += 8;
 			});
 
@@ -477,91 +507,79 @@
 			y += 4;
 			doc.setFontSize(11);
 			doc.setTextColor(30, 30, 30);
-			doc.text(L.targetSection, 14, y);
+			txt(L.targetSection, 14, y);
 			y += 5;
 
 			const targetRows: [string, string][] = [
-				[L.targetLabel,  `${(330_000).toLocaleString('tr-TR')} $`],
-				[L.achievedUsd,  `${fmt(achievedUSD)} $`],
-				[L.achievedTl,   `${fmt(achievedTL)} TL`],
-				[L.remaining,    `${fmt(remaining)} $ ${L.remainingSuffix}`]
+				[L.targetLabel, `${(330_000).toLocaleString('tr-TR')} $`],
+				[L.achievedUsd, `${fmt(achievedUSD)} $`],
+				[L.achievedTl,  `${fmt(achievedTL)} TL`],
+				[L.remaining,   `${fmt(remaining)} $ ${L.remainingSuffix}`]
 			];
-
 			targetRows.forEach(([label, val], i) => {
 				const bg = i === 3 ? [255, 243, 243] : (i % 2 === 0 ? [240, 253, 244] : [245, 250, 245]);
 				doc.setFillColor(bg[0], bg[1], bg[2]);
-				doc.rect(14, y - 4, 129, 7, 'F');
+				rct(14, y - 4, 129, 7, 'F');
 				doc.setFontSize(8);
 				doc.setTextColor(i === 3 ? 180 : 30, 30, 30);
-				doc.text(label, 16, y);
-				doc.text(val, 108, y);
+				txt(label, 16,  y);
+				txt(val,   108, y);
 				y += 8;
 			});
 
-			// ── D) Charts (right column, x: 153–283) ──────────────────────────
+			// ── D) Charts (right column LTR / left column RTL, x: 153–283) ─────
 			const barImg  = await captureElement(barChartContainer);
 			const lineImg = await captureElement(lineChartContainer);
 
 			if (barImg) {
-				doc.addImage(barImg, 'PNG', 153, 52, 132, 44);
+				addImg(barImg, 'PNG', 153, 52, 132, 44);
 			} else {
-				// Text fallback: bar chart data table
 				let cx = 153, cy = 56;
-				doc.setFontSize(9);
-				doc.setTextColor(60, 60, 60);
-				doc.text(L.barChartTitle, cx, cy); cy += 6;
-				const visibleBuckets = chartData.filter(d => d.quoteCount > 0 || d.orderCount > 0).slice(0, 10);
-				if (visibleBuckets.length === 0) {
-					doc.setTextColor(150, 150, 150);
-					doc.text(L.noData, cx, cy);
+				doc.setFontSize(9); doc.setTextColor(60, 60, 60);
+				txt(L.barChartTitle, cx, cy); cy += 6;
+				const vis = chartData.filter(d => d.quoteCount > 0 || d.orderCount > 0).slice(0, 10);
+				if (vis.length === 0) {
+					doc.setTextColor(150, 150, 150); txt(L.noData, cx, cy);
 				} else {
-					doc.setFillColor(37, 99, 235);
-					doc.rect(cx, cy, 80, 6, 'F');
-					doc.setFontSize(7.5);
-					doc.setTextColor(255, 255, 255);
-					doc.text(L.colPeriod, cx + 1, cy + 4.5);
-					doc.text(L.colQuotes, cx + 30, cy + 4.5);
-					doc.text(L.colOrders, cx + 55, cy + 4.5);
+					doc.setFillColor(37, 99, 235); rct(cx, cy, 80, 6, 'F');
+					doc.setFontSize(7.5); doc.setTextColor(255, 255, 255);
+					txt(L.colPeriod, cx + 1,  cy + 4.5);
+					txt(L.colQuotes, cx + 30, cy + 4.5);
+					txt(L.colOrders, cx + 55, cy + 4.5);
 					cy += 8;
-					visibleBuckets.forEach((d, i) => {
-						if (i % 2 === 0) { doc.setFillColor(245, 245, 250); doc.rect(cx, cy - 4, 80, 6, 'F'); }
-						doc.setFontSize(7.5);
-						doc.setTextColor(30, 30, 30);
-						doc.text(d.label, cx + 1, cy);
-						doc.text(String(d.quoteCount), cx + 30, cy);
-						doc.text(String(d.orderCount), cx + 55, cy);
+					vis.forEach((d, i) => {
+						if (i % 2 === 0) { doc.setFillColor(245, 245, 250); rct(cx, cy - 4, 80, 6, 'F'); }
+						doc.setFontSize(7.5); doc.setTextColor(30, 30, 30);
+						txt(d.label,             cx + 1,  cy);
+						txt(String(d.quoteCount), cx + 30, cy);
+						txt(String(d.orderCount), cx + 55, cy);
 						cy += 7;
 					});
 				}
 			}
 
 			if (lineImg) {
-				doc.addImage(lineImg, 'PNG', 153, 100, 132, 44);
+				addImg(lineImg, 'PNG', 153, 100, 132, 44);
 			} else {
 				let cx = 153, cy = 104;
-				doc.setFontSize(9);
-				doc.setTextColor(60, 60, 60);
-				doc.text(L.lineChartTitle, cx, cy); cy += 6;
-				const visibleBuckets = chartData.filter(d => d.quoteAmt > 0 || d.orderAmt > 0).slice(0, 10);
-				if (visibleBuckets.length === 0) {
-					doc.setTextColor(150, 150, 150);
-					doc.text(L.noData, cx, cy);
+				doc.setFontSize(9); doc.setTextColor(60, 60, 60);
+				txt(L.lineChartTitle, cx, cy); cy += 6;
+				const vis = chartData.filter(d => d.quoteAmt > 0 || d.orderAmt > 0).slice(0, 10);
+				if (vis.length === 0) {
+					doc.setTextColor(150, 150, 150); txt(L.noData, cx, cy);
 				} else {
-					doc.setFillColor(37, 99, 235);
-					doc.rect(cx, cy, 100, 6, 'F');
-					doc.setFontSize(7.5);
-					doc.setTextColor(255, 255, 255);
-					doc.text(L.colPeriod, cx + 1, cy + 4.5);
-					doc.text(`${L.colQuotes} TRY`, cx + 30, cy + 4.5);
-					doc.text(`${L.colOrders} TRY`, cx + 70, cy + 4.5);
+					doc.setFillColor(37, 99, 235); rct(cx, cy, 100, 6, 'F');
+					doc.setFontSize(7.5); doc.setTextColor(255, 255, 255);
+					txt(L.colPeriod,            cx + 1,  cy + 4.5);
+					txt(`${L.colQuotes} TRY`,   cx + 30, cy + 4.5);
+					txt(`${L.colOrders} TRY`,   cx + 70, cy + 4.5);
 					cy += 8;
-					visibleBuckets.forEach((d, i) => {
-						if (i % 2 === 0) { doc.setFillColor(245, 245, 250); doc.rect(cx, cy - 4, 100, 6, 'F'); }
-						doc.setFontSize(7.5);
-						doc.setTextColor(30, 30, 30);
-						doc.text(d.label, cx + 1, cy);
-						doc.text(fmtK(d.quoteAmt), cx + 30, cy);
-						doc.text(fmtK(d.orderAmt), cx + 70, cy);
+					vis.forEach((d, i) => {
+						if (i % 2 === 0) { doc.setFillColor(245, 245, 250); rct(cx, cy - 4, 100, 6, 'F'); }
+						doc.setFontSize(7.5); doc.setTextColor(30, 30, 30);
+						txt(d.label,           cx + 1,  cy);
+						txt(fmtK(d.quoteAmt),  cx + 30, cy);
+						txt(fmtK(d.orderAmt),  cx + 70, cy);
 						cy += 7;
 					});
 				}
@@ -570,46 +588,42 @@
 			// ── E) Detail table (personnel tab) ───────────────────────────────
 			if (activeTab === 'personnel' && personnelRows.length > 0) {
 				doc.addPage();
-				if (fontBase64) doc.setFont('NotoSans', 'normal');
+				setFnt();
 				let dy = 20;
-				doc.setFontSize(13);
-				doc.setTextColor(30, 30, 30);
-				doc.text(L.detail, 14, dy);
+				doc.setFontSize(13); doc.setTextColor(30, 30, 30);
+				txt(L.detail, 14, dy);
 				dy += 8;
 
-				const detailCols = [14, 55, 100, 170, 230, 265];
+				const dc = [14, 55, 100, 170, 230]; // column x positions
 				doc.setFillColor(37, 99, 235);
-				doc.rect(14, dy - 5, 265, 8, 'F');
-				doc.setFontSize(8.5);
-				doc.setTextColor(255, 255, 255);
-				doc.text(L.date,     detailCols[0], dy);
-				doc.text(L.customer, detailCols[1], dy);
-				doc.text(L.quote,    detailCols[2], dy);
-				doc.text(L.amount,   detailCols[3], dy);
-				doc.text(L.status,   detailCols[4], dy);
+				rct(14, dy - 5, 265, 8, 'F');
+				doc.setFontSize(8.5); doc.setTextColor(255, 255, 255);
+				txt(L.date,     dc[0], dy);
+				txt(L.customer, dc[1], dy);
+				txt(L.quote,    dc[2], dy);
+				txt(L.amount,   dc[3], dy);
+				txt(L.status,   dc[4], dy);
 				dy += 9;
 
 				doc.setTextColor(30, 30, 30);
 				for (const [ri, row] of personnelRows.entries()) {
-					if (dy > 195) { doc.addPage(); if (fontBase64) doc.setFont('NotoSans', 'normal'); dy = 20; }
-					if (ri % 2 === 0) {
-						doc.setFillColor(245, 245, 250);
-						doc.rect(14, dy - 4, 265, 7, 'F');
-					}
+					if (dy > 195) { doc.addPage(); setFnt(); dy = 20; }
+					if (ri % 2 === 0) { doc.setFillColor(245, 245, 250); rct(14, dy - 4, 265, 7, 'F'); }
 					doc.setFontSize(8);
-					doc.text(row.date,                  detailCols[0], dy);
-					doc.text(row.assignedTo.slice(0,24), detailCols[1], dy);
-					doc.text(row.quoteNumber,            detailCols[2], dy);
-					doc.text(`${fmt(row.amount)} ${row.currency}`, detailCols[3], dy);
-					doc.text(statusLabel(row.status),   detailCols[4], dy);
+					txt(row.date,                    dc[0], dy);
+					txt(row.assignedTo.slice(0, 24), dc[1], dy);
+					txt(row.quoteNumber,              dc[2], dy);
+					txt(`${fmt(row.amount)} ${row.currency}`, dc[3], dy);
+					txt(statusLabel(row.status),      dc[4], dy);
 					dy += 7;
 				}
 			}
 
 			doc.save('satis-raporu.pdf');
 		} finally {
-			pdfExporting = false;
-			pdfModal = false;
+			pdfExporting   = false;
+			pdfLoadingFont = false;
+			pdfModal       = false;
 		}
 	}
 </script>
@@ -930,7 +944,7 @@
 					disabled={pdfExporting}
 					class="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
 				>
-					{pdfExporting ? 'Oluşturuluyor…' : 'PDF Oluştur'}
+					{pdfLoadingFont ? 'PDF hazırlanıyor...' : pdfExporting ? 'Oluşturuluyor…' : 'PDF Oluştur'}
 				</button>
 			</div>
 		</div>
