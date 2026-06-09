@@ -137,6 +137,10 @@ const schema = i.schema({
 			status: i.string().indexed(),
 			description: i.string().optional(),
 			technicalDescription: i.string().optional(),
+			// base64 encoded — geçici, ileride Cloudflare R2 ile değiştirilecek
+			photo: i.string().optional(),
+			technicalDrawing: i.string().optional(),
+			includedParts: i.string().optional(),
 			// string[] — Uploadthing URL'leri
 			photoUrls: i.json().optional(),
 			technicalDrawingUrl: i.string().optional(),
@@ -146,7 +150,43 @@ const schema = i.schema({
 			createdBy: i.string(),
 			createdAt: i.number(),
 			updatedBy: i.string().optional(),
-			updatedAt: i.number().optional()
+			updatedAt: i.number().optional(),
+
+			// ── Fırça Modeli ────────────────────────────────────────────────────────
+			brushType: i.string().optional(),
+			brushWidth: i.number().optional(),
+			brushLength: i.number().optional(),
+			brushHeight: i.number().optional(),
+			processingType: i.string().optional(),
+			trimmingType: i.string().optional(),
+
+			// ── Taban & Ensör ────────────────────────────────────────────────────────
+			baseMaterial: i.string().optional(),
+			encoderDiameter: i.string().optional(),
+
+			// ── Kıl Hesaplama ────────────────────────────────────────────────────────
+			bristleMaterial: i.string().optional(),
+			bristleThickness: i.string().optional(),
+			bristleLength: i.number().optional(),
+			wireDiameter: i.string().optional(),
+
+			// ── Ek Özellikler ────────────────────────────────────────────────────────
+			specialProcess: i.boolean().optional(),
+			externalProcess: i.number().optional(),
+			extraEquipment: i.number().optional(),
+			packaging: i.number().optional(),
+
+			// ── İşçilik Hesaplama ────────────────────────────────────────────────────
+			bristleInsertionTime: i.number().optional(),
+			bristleTrimmingTime: i.number().optional(),
+			baseProcessingTime: i.number().optional(),
+			packagingTime: i.number().optional(),
+
+			// ── Sipariş Durumu ────────────────────────────────────────────────────────
+			highPotential: i.boolean().optional(),
+			urgentProduction: i.boolean().optional(),
+			orderQuantity: i.number().optional(),
+			sourceProductId: i.string().optional()
 		}),
 
 		/**

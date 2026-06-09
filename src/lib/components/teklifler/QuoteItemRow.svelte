@@ -3,7 +3,7 @@
 	import type { LineItem } from './QuoteForm.svelte';
 	import type { ProductRaw } from './QuoteForm.svelte';
 	import Modal from '$lib/components/ui/Modal.svelte';
-	import ProductFormModal from '$lib/components/ui/ProductFormModal.svelte';
+	import ProductFormModal, { type EditableProduct } from '$lib/components/ui/ProductFormModal.svelte';
 
 	let {
 		item = $bindable(),
@@ -125,7 +125,7 @@
 		} else if (e.key === 'Enter') {
 			e.preventDefault();
 			if (highlightedIdx >= 0 && filtered[highlightedIdx]) {
-				selectProduct(filtered[highlightedIdx]);
+				openReview(filtered[highlightedIdx]);
 			}
 		} else if (e.key === 'Escape') {
 			closeSearch();
@@ -137,6 +137,57 @@
 
 	function openManual() {
 		manualOpen = true;
+	}
+
+	// ─── Mode 3: Product review/derive modal ──────────────────────────────────────
+	let reviewOpen   = $state(false);
+	let reviewSource = $state<ProductRaw | null>(null);
+
+	function toEditable(p: ProductRaw): EditableProduct {
+		const r = p as unknown as Record<string, unknown>;
+		return {
+			id:                   p.id,
+			name:                 p.name,
+			sku:                  p.sku,
+			firm:                 p.firm,
+			category:             p.category,
+			description:          r['description'] as string | undefined,
+			applicationArea:      r['applicationArea'] as string | undefined,
+			photo:                r['photo'] as string | undefined,
+			technicalDrawing:     r['technicalDrawing'] as string | undefined,
+			technicalDescription: r['technicalDescription'] as string | undefined,
+			includedParts:        r['includedParts'] as string | undefined,
+			type:                 r['type'] as string | undefined,
+			brushType:            r['brushType'] as string | undefined,
+			brushWidth:           r['brushWidth'] as number | undefined,
+			brushLength:          r['brushLength'] as number | undefined,
+			brushHeight:          r['brushHeight'] as number | undefined,
+			processingType:       r['processingType'] as string | undefined,
+			trimmingType:         r['trimmingType'] as string | undefined,
+			baseMaterial:         r['baseMaterial'] as string | undefined,
+			encoderDiameter:      r['encoderDiameter'] as string | undefined,
+			bristleMaterial:      r['bristleMaterial'] as string | undefined,
+			bristleThickness:     r['bristleThickness'] as string | undefined,
+			bristleLength:        r['bristleLength'] as number | undefined,
+			wireDiameter:         r['wireDiameter'] as string | undefined,
+			specialProcess:       r['specialProcess'] as boolean | undefined,
+			externalProcess:      r['externalProcess'] as number | undefined,
+			extraEquipment:       r['extraEquipment'] as number | undefined,
+			packaging:            r['packaging'] as number | undefined,
+			bristleInsertionTime: r['bristleInsertionTime'] as number | undefined,
+			bristleTrimmingTime:  r['bristleTrimmingTime'] as number | undefined,
+			baseProcessingTime:   r['baseProcessingTime'] as number | undefined,
+			packagingTime:        r['packagingTime'] as number | undefined,
+			highPotential:        r['highPotential'] as boolean | undefined,
+			urgentProduction:     r['urgentProduction'] as boolean | undefined,
+			orderQuantity:        r['orderQuantity'] as number | undefined,
+		};
+	}
+
+	function openReview(p: ProductRaw) {
+		reviewSource = p;
+		closeSearch();
+		reviewOpen = true;
 	}
 </script>
 
@@ -303,7 +354,7 @@
 				{@const absoluteIdx = startIdx + vi}
 				<button
 					type="button"
-					onclick={() => selectProduct(p)}
+					onclick={() => openReview(p)}
 					class="flex w-full items-center gap-3 px-4 text-left transition-colors"
 					style="height: {ITEM_HEIGHT}px;"
 					class:bg-[#222]={absoluteIdx === highlightedIdx}
@@ -356,9 +407,9 @@
 		item.productName     = p.name;
 		item.productSku      = p.sku;
 		item.brandName       = '';
-		item.productDetail   = p.detail;
-		item.productCode     = p.code;
-		item.productSerialNo = p.serialNo;
+		item.productDetail   = (p as any).detail;
+		item.productCode     = (p as any).code;
+		item.productSerialNo = (p as any).serialNo;
 		item.productCategory = p.category;
 		item.productFirm     = p.firm;
 		item.vatRate         = 20;
@@ -367,4 +418,32 @@
 		searchOpen           = false;
 	}}
 	onclose={() => (manualOpen = false)}
+/>
+
+<!-- ─── Mode 3: Product Review Modal ──────────────────────────────────────────── -->
+<ProductFormModal
+	open={reviewOpen}
+	{companyId}
+	quoteMode={true}
+	quoteSourceProduct={reviewSource ? toEditable(reviewSource) : null}
+	onAddToQuote={() => {
+		if (reviewSource) selectProduct(reviewSource);
+	}}
+	onSaveAndAdd={(p) => {
+		if (reviewSource) {
+			item.productId       = p.id;
+			item.productName     = p.name;
+			item.productSku      = p.sku;
+			item.brandName       = p.firm ?? reviewSource.firm ?? '';
+			item.listPrice       = reviewSource.unitPrice ?? reviewSource.basePrice ?? 0;
+			item.vatRate         = reviewSource.vatRate ?? 20;
+			item.unit            = reviewSource.unit ?? 'Adet';
+			item.productDetail   = reviewSource.detail ?? '';
+			item.productCode     = '';
+			item.productSerialNo = '';
+			item.productCategory = p.category ?? reviewSource.category ?? '';
+			item.productFirm     = p.firm ?? reviewSource.firm ?? '';
+		}
+	}}
+	onclose={() => { reviewOpen = false; reviewSource = null; }}
 />

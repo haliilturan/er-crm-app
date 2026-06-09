@@ -27,15 +27,44 @@
 	import { SectionHead, Modal, TextArea, Select } from '$lib/components/ui';
 	import QuoteItemRow from './QuoteItemRow.svelte';
 
+	export type EditableQuote = {
+		id: string;
+		createdBy: string;
+		quoteNumber: string;
+		status: string;
+		companyId?: string;
+		currency?: string;
+		exchangeRate?: number;
+		language?: string;
+		notes?: string;
+		internalNotes?: string;
+		deliveryType?: string;
+		deliveryFirm?: string;
+		deliveryPayment?: string;
+		deliveryAddress?: string;
+		deliveryCity?: string;
+		deliveryCountry?: string;
+		installationType?: string;
+		paymentType?: string;
+		estimatedDeliveryDate?: number;
+		validUntil?: number;
+		productionDuration?: string;
+		bankAccount?: string;
+	};
+
 	let {
 		customerId,
 		onClose,
-		onSaved
+		onSaved,
+		editQuote = null
 	}: {
 		customerId: string;
 		onClose: () => void;
 		onSaved: () => void;
+		editQuote?: EditableQuote | null;
 	} = $props();
+
+	const isOwner = $derived(!editQuote || editQuote.createdBy === authStore.userId);
 
 	// ─── Customer name ───────────────────────────────────────────────────────────
 	let customerName = $state('');
@@ -198,18 +227,196 @@
 	let saving    = $state(false);
 	let saveError = $state('');
 
+	// ─── Edit mode: pre-fill + item tracking ─────────────────────────────────────
+	let editItemIds     = $state<string[]>([]);
+	let editItemsLoaded = $state(false);
+
+	$effect(() => {
+		const eq = editQuote;
+		if (!eq) {
+			untrack(() => { editItemsLoaded = false; editItemIds = []; });
+			return;
+		}
+		untrack(() => {
+			if (eq.companyId) companyId = eq.companyId;
+			currency           = eq.currency            ?? 'TRY';
+			exchangeRate       = eq.exchangeRate         ?? 1;
+			language           = eq.language             ?? 'tr';
+			deliveryType       = eq.deliveryType         ?? '';
+			deliveryFirm       = eq.deliveryFirm         ?? '';
+			deliveryPayment    = eq.deliveryPayment       ?? '';
+			deliveryAddress    = eq.deliveryAddress       ?? '';
+			deliveryCity       = eq.deliveryCity          ?? '';
+			deliveryCountry    = eq.deliveryCountry       ?? 'Türkiye';
+			installationType   = eq.installationType      ?? '';
+			paymentType        = eq.paymentType           ?? '';
+			estimatedDate      = eq.estimatedDeliveryDate
+				? new Date(eq.estimatedDeliveryDate).toISOString().slice(0, 10) : '';
+			validUntilDate     = eq.validUntil
+				? new Date(eq.validUntil).toISOString().slice(0, 10) : '';
+			productionDuration = eq.productionDuration    ?? '';
+			bankAccount        = eq.bankAccount           ?? '';
+			internalNotes      = eq.internalNotes         ?? '';
+			notes              = eq.notes                 ?? '';
+		});
+	});
+
+	$effect(() => {
+		const eq = editQuote;
+		if (!eq) return;
+		return db.subscribeQuery(
+			{ quoteItems: { $: { where: { quoteId: eq.id } } } },
+			(result) => {
+				untrack(() => {
+					if (result.isLoading) return;
+					if (editItemsLoaded) return;
+					const rawItems = ((result.data?.quoteItems ?? []) as any[])
+						.slice()
+						.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+					console.log('[QuoteForm] quoteItems raw from InstantDB:', rawItems);
+					editItemIds = rawItems.map((it) => String(it.id));
+					items = rawItems.length > 0
+						? rawItems.map((it) => ({
+							tempId:          crypto.randomUUID(),
+							productId:       it.productId       ?? '',
+							productName:     it.productName     ?? '',
+							productSku:      it.productSku      ?? '',
+							brandName:       it.brandName       ?? '',
+							unit:            it.unit            ?? 'Adet',
+							quantity:        it.quantity        ?? 1,
+							listPrice:       it.listPrice       ?? 0,
+							discountRate:    it.discountRate    ?? 0,
+							vatRate:         it.vatRate         ?? 20,
+							notes:           it.notes           ?? '',
+							isIncludedPart:  it.isIncludedPart  ?? false,
+							productDetail:   it.productDetail   ?? '',
+							productCode:     it.productCode     ?? '',
+							productSerialNo: it.productSerialNo ?? '',
+							productCategory: it.productCategory ?? '',
+							productFirm:     it.productFirm     ?? '',
+						}))
+						: [emptyItem()];
+					editItemsLoaded = true;
+				});
+			}
+		);
+	});
+
+	function buildItemOps(quoteId: string) {
+		const ops: any[] = [];
+		for (let i = 0; i < items.length; i++) {
+			const it     = items[i];
+			const itemId = id();
+			const up     = it.listPrice * (1 - it.discountRate / 100);
+			const lt     = up * it.quantity;
+			const va     = lt * it.vatRate / 100;
+			ops.push(
+				tx.quoteItems[itemId].update({
+					quoteId,
+					companyId,
+					productId:        it.productId || undefined,
+					isIncludedPart:   it.isIncludedPart,
+					productName:      it.productName,
+					productSku:       it.productSku || undefined,
+					brandName:        it.brandName || undefined,
+					unit:             it.unit,
+					quantity:         it.quantity,
+					listPrice:        it.listPrice,
+					discountRate:     it.discountRate,
+					unitPrice:        Math.round(up * 100) / 100,
+					vatRate:          it.vatRate,
+					vatAmount:        Math.round(va * 100) / 100,
+					lineTotal:        Math.round(lt * 100) / 100,
+					lineTotalWithVat: Math.round((lt + va) * 100) / 100,
+					...(it.notes && { notes: it.notes }),
+					sortOrder: i
+				}),
+				tx.quoteItems[itemId].link({ quote: quoteId })
+			);
+			if (it.productId) ops.push(tx.quoteItems[itemId].link({ product: it.productId }));
+		}
+		return ops;
+	}
+
 	async function saveToDb(): Promise<string | null> {
 		const userId = authStore.userId;
 		if (!userId || !companyId) { saveError = 'Oturum veya şirket bilgisi eksik.'; return null; }
+		if (!isOwner) { saveError = 'Bu teklifi düzenleme yetkiniz yok.'; return null; }
 		if (items.some((it) => !it.productName.trim())) { saveError = 'Tüm satırlarda ürün adı girilmeli.'; return null; }
 
 		saving    = true;
 		saveError = '';
 
+		const actorName = companyUsers.find((u) => u.userId === userId)?.fullName
+			?? authStore.userEmail?.split('@')[0]
+			?? 'Kullanıcı';
+
 		try {
+			const now = Date.now();
+
+			// ── EDIT (UPDATE) mode ────────────────────────────────────────────────────
+			if (editQuote) {
+				const quoteId     = editQuote.id;
+				const quoteNumber = editQuote.quoteNumber;
+
+				const quoteFields = {
+					currency,
+					exchangeRate:      currency !== 'TRY' ? exchangeRate : undefined,
+					subtotal:          Math.round(subtotal * 100) / 100,
+					totalVat:          Math.round(totalVat * 100) / 100,
+					totalWithVat:      Math.round(totalWithVat * 100) / 100,
+					language,
+					...(deliveryType       && { deliveryType }),
+					...(deliveryFirm       && { deliveryFirm }),
+					...(deliveryPayment    && { deliveryPayment }),
+					...(deliveryAddress    && { deliveryAddress }),
+					...(deliveryCity       && { deliveryCity }),
+					...(deliveryCountry    && { deliveryCountry }),
+					...(installationType   && { installationType }),
+					...(paymentType        && { paymentType }),
+					...(estimatedDate      && { estimatedDeliveryDate: new Date(estimatedDate).getTime() }),
+					...(validUntilDate     && { validUntil: new Date(validUntilDate).getTime() }),
+					...(productionDuration && { productionDuration }),
+					...(bankAccount        && { bankAccount }),
+					internalNotes:     internalNotes || undefined,
+					notes:             notes         || undefined,
+					updatedBy:         userId,
+					updatedAt:         now,
+				};
+
+				const ops: any[] = [tx.quotes[quoteId].update(quoteFields)];
+
+				// Delete old items, recreate with current form state
+				for (const oldId of editItemIds) {
+					ops.push(tx.quoteItems[oldId].delete());
+				}
+				ops.push(...buildItemOps(quoteId));
+
+				// Activity feed
+				const actFeedId = id();
+				ops.push(
+					tx.activityFeed[actFeedId].update({
+						type:                'quote_updated',
+						companyId,
+						actorId:             userId,
+						actorName,
+						description:         '1 teklif güncelledi',
+						relatedEntityType:   'quote',
+						relatedEntityId:     quoteId,
+						relatedEntityNumber: quoteNumber,
+						createdAt:           now
+					})
+				);
+
+				await db.transact(ops);
+				savedQuoteId     = quoteId;
+				savedQuoteNumber = quoteNumber;
+				return quoteId;
+			}
+
+			// ── CREATE mode ───────────────────────────────────────────────────────────
 			const quoteId     = id();
 			const quoteNumber = `TASLAK-${Date.now()}`;
-			const now         = Date.now();
 
 			const ops = [
 				tx.quotes[quoteId].update({
@@ -241,47 +448,11 @@
 					createdBy: userId,
 					createdAt: now
 				}),
-				tx.quotes[quoteId].link({ customer: customerId })
+				tx.quotes[quoteId].link({ customer: customerId }),
+				...buildItemOps(quoteId)
 			];
 
-			console.log('[QuoteForm] writing quoteItems:', items.map(it => ({ ...it })));
-
-			for (let i = 0; i < items.length; i++) {
-				const it     = items[i];
-				const itemId = id();
-				const up     = it.listPrice * (1 - it.discountRate / 100);
-				const lt     = up * it.quantity;
-				const va     = lt * it.vatRate / 100;
-
-				ops.push(
-					tx.quoteItems[itemId].update({
-						quoteId,
-						companyId,
-						productId:        it.productId || undefined,
-						isIncludedPart:   it.isIncludedPart,
-						productName:      it.productName,
-						productSku:       it.productSku || undefined,
-						brandName:        it.brandName || undefined,
-						unit:             it.unit,
-						quantity:         it.quantity,
-						listPrice:        it.listPrice,
-						discountRate:     it.discountRate,
-						unitPrice:        Math.round(up * 100) / 100,
-						vatRate:          it.vatRate,
-						vatAmount:        Math.round(va * 100) / 100,
-						lineTotal:        Math.round(lt * 100) / 100,
-						lineTotalWithVat: Math.round((lt + va) * 100) / 100,
-						...(it.notes && { notes: it.notes }),
-						sortOrder: i
-					}),
-					tx.quoteItems[itemId].link({ quote: quoteId })
-				);
-				if (it.productId) {
-					ops.push(tx.quoteItems[itemId].link({ product: it.productId }));
-				}
-			}
-
-			// Auto-create quote tracking task (same atomic transaction)
+			// Auto-create tracking task
 			const autoTaskId = id();
 			ops.push(
 				tx.tasks[autoTaskId].update({
@@ -299,10 +470,7 @@
 				})
 			);
 
-			// Activity feed kaydı
-			const actorName   = companyUsers.find((u) => u.userId === userId)?.fullName
-				?? authStore.userEmail?.split('@')[0]
-				?? 'Kullanıcı';
+			// Activity feed
 			const actFeedId = id();
 			ops.push(
 				tx.activityFeed[actFeedId].update({
@@ -318,14 +486,12 @@
 				})
 			);
 
-			console.log('[QuoteForm] saveToDb:', { opsCount: ops.length, quoteId, autoTaskId, customerName });
 			await db.transact(ops);
-			console.log('[QuoteForm] saveToDb OK:', quoteId);
 			savedQuoteId     = quoteId;
 			savedQuoteNumber = quoteNumber;
 			return quoteId;
 		} catch {
-			saveError = 'Teklif kaydedilemedi. Lütfen tekrar deneyin.';
+			saveError = editQuote ? 'Teklif güncellenemedi. Lütfen tekrar deneyin.' : 'Teklif kaydedilemedi. Lütfen tekrar deneyin.';
 			return null;
 		} finally {
 			saving = false;
@@ -430,7 +596,7 @@
 		doc.text('GENEL TOPLAM :', 130, y);
 		doc.text(`${fmt(totalWithVat)} ${currSym}`, 188, y, { align: 'right' });
 
-		doc.save(`teklif-${normTR(qNum)}.pdf`);
+		doc.save(`${normTR(qNum)}.pdf`);
 	}
 
 	// ─── Göreve Gönder ────────────────────────────────────────────────────────────
@@ -523,7 +689,10 @@
 	<!-- ── Header ────────────────────────────────────────────────────────────────── -->
 	<div class="shrink-0 border-b border-[#2a2a2a] px-6 py-4">
 		<div class="flex items-center justify-between gap-3">
-			<SectionHead title="Yeni Teklif" description="Taslak olarak kaydedilecek" />
+			<SectionHead
+				title={editQuote ? `${editQuote.quoteNumber} — Düzenle` : 'Yeni Teklif'}
+				description={editQuote ? (isOwner ? 'Teklif güncelleniyor' : 'Bu teklif size ait değil') : 'Taslak olarak kaydedilecek'}
+			/>
 			<div class="flex items-center gap-2">
 				<button
 					type="button"
@@ -548,38 +717,46 @@
 					PDF İndir
 				</button>
 
-				<!-- Göreve Gönder -->
-				<button
-					type="button"
-					onclick={openGorevModal}
-					disabled={saving}
-					class="flex items-center gap-1.5 rounded-full border border-indigo-700 bg-indigo-900/30 px-3 py-1.5 text-sm text-indigo-300 transition-colors hover:bg-indigo-800/40 disabled:opacity-50"
-					title="Göreve gönder"
-				>
-					<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-					</svg>
-					Göreve Gönder
-				</button>
+				<!-- Göreve Gönder (edit modunda gizle) -->
+				{#if !editQuote}
+					<button
+						type="button"
+						onclick={openGorevModal}
+						disabled={saving}
+						class="flex items-center gap-1.5 rounded-full border border-indigo-700 bg-indigo-900/30 px-3 py-1.5 text-sm text-indigo-300 transition-colors hover:bg-indigo-800/40 disabled:opacity-50"
+						title="Göreve gönder"
+					>
+						<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+							<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
+						</svg>
+						Göreve Gönder
+					</button>
+				{/if}
 
-				<!-- Taslak Kaydet -->
+				<!-- Kaydet / Güncelle (owner değilse disabled) -->
 				<button
 					type="button"
 					onclick={save}
-					disabled={saving}
-					class="flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-black transition hover:bg-[#e0e0e0] disabled:opacity-50"
+					disabled={saving || !isOwner}
+					title={!isOwner ? 'Bu teklifi düzenleme yetkiniz yok' : undefined}
+					class="flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-black transition hover:bg-[#e0e0e0] disabled:opacity-40 disabled:cursor-not-allowed"
 				>
 					{#if saving}
 						<span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black border-t-transparent"></span>
 						Kaydediliyor...
 					{:else}
-						Taslak Kaydet
+						{editQuote ? 'Güncelle' : 'Taslak Kaydet'}
 					{/if}
 				</button>
 			</div>
 		</div>
 		{#if saveError}
 			<p class="mt-2 rounded-lg bg-[#2a1a1a] border border-[#ff4444]/30 px-3 py-2 text-sm text-[#ff4444]">{saveError}</p>
+		{/if}
+		{#if editQuote && !isOwner}
+			<p class="px-6 py-2 text-xs text-amber-500 bg-amber-950/20 border-b border-amber-900/30">
+				Bu teklif başka bir personele ait — yalnızca görüntüleyebilirsiniz.
+			</p>
 		{/if}
 	</div>
 

@@ -44,7 +44,16 @@
       "Bash(Select-Object -First 20)",
       "PowerShell(Get-ChildItem -Path \"C:\\\\Users\\\\MONSTER\\\\Desktop\\\\erp-app\" -Recurse -Directory | Select-Object -ExpandProperty FullName | ForEach-Object { $_ -replace [regex]::Escape\\(\"C:\\\\Users\\\\MONSTER\\\\Desktop\\\\erp-app\"\\), \"\" } | Sort-Object)",
       "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\MONSTER\\\\Desktop\\\\erp-app\" -File)",
-      "Bash(Select-Object -ExpandProperty Name)"
+      "Bash(Select-Object -ExpandProperty Name)",
+      "Bash(npx instant-cli *)",
+      "Bash(npx instant-cli@1.0.45 push schema)",
+      "Bash(Get-ChildItem -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\src\" -Recurse -Directory)",
+      "Bash(Select-Object -First 30 FullName)",
+      "Bash(Get-ChildItem -Recurse -Path \"C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm\\\\src\\\\routes\" -Filter \"*.svelte\")",
+      "Bash(Select-Object FullName)",
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git push *)"
     ]
   },
   "enableAllProjectMcpServers": true,

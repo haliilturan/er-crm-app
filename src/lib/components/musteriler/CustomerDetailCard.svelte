@@ -18,17 +18,22 @@
 	type CustomerRow = {
 		id: string;
 		name: string;
-		phone: string;
-		email?: string;
-		country?: string;
-		city?: string;
-		address?: string;
-		taxNumber?: string;
+		companyId?: string;
 		companyType: string;
 		status: string;
 		source?: string;
 		contactName?: string;
 		contactTitle?: string;
+		phone: string;
+		phoneLandline?: string;
+		email?: string;
+		website?: string;
+		country?: string;
+		state?: string;
+		city?: string;
+		address?: string;
+		deliveryAddress?: string;
+		taxNumber?: string;
 		createdAt: number;
 	};
 
@@ -50,8 +55,25 @@
 		subtotal?: number;
 		totalVat?: number;
 		notes?: string;
+		internalNotes?: string;
+		language?: string;
+		exchangeRate?: number;
 		createdAt: number;
+		createdBy: string;
+		companyId?: string;
 		items?: any[];
+		deliveryType?: string;
+		deliveryFirm?: string;
+		deliveryPayment?: string;
+		deliveryAddress?: string;
+		deliveryCity?: string;
+		deliveryCountry?: string;
+		installationType?: string;
+		paymentType?: string;
+		estimatedDeliveryDate?: number;
+		validUntil?: number;
+		productionDuration?: string;
+		bankAccount?: string;
 	};
 
 	type OrderRow = {
@@ -108,12 +130,6 @@
 		individual: 'Bireysel'
 	};
 
-	const sourceLabels: Record<string, string> = {
-		referral: 'Referans',
-		web: 'Web',
-		cold: 'Soğuk İletişim',
-		other: 'Diğer'
-	};
 
 	const statusConfig: Record<string, { label: string; variant: 'default' | 'success' | 'warning' | 'danger' | 'info' }> = {
 		lead:              { label: 'Potansiyel',   variant: 'warning' },
@@ -134,6 +150,7 @@
 	// ─── State ────────────────────────────────────────────────────────────────
 	let tabValue      = $state('info');
 	let showQuoteForm = $state(false);
+	let editingQuote  = $state<QuoteRow | null>(null);
 	let customer   = $state<CustomerRow | null>(null);
 	let notes      = $state<NoteRow[]>([]);
 	let quotes     = $state<QuoteRow[]>([]);
@@ -506,7 +523,7 @@
 				doc.text(wrapped, ML, y);
 			}
 
-			doc.save(`${isQuote ? 'teklif' : 'siparis'}-${entityNum}.pdf`);
+			doc.save(`${isQuote ? entityNum : `SIPARIS-${entityNum}`}.pdf`);
 		} finally {
 			pdfGenerating = false;
 		}
@@ -562,27 +579,33 @@
 			{#if tabValue === 'info'}
 				<div class="flex flex-col gap-4 max-w-2xl">
 
-					{#snippet infoCard(heading: string)}
-						<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
-							<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">{heading}</p>
-						</div>
+					{#snippet inforow(label: string, value: string | undefined)}
+						{#if value}
+							<div class="flex items-start justify-between gap-4 py-2.5">
+								<dt class="text-sm text-[#888] shrink-0">{label}</dt>
+								<dd class="text-sm font-medium text-white text-right">{value}</dd>
+							</div>
+						{/if}
 					{/snippet}
 
 					<!-- Genel -->
 					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
 						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Genel</p>
 						<dl class="divide-y divide-[#2a2a2a]">
-							{#snippet inforow(label: string, value: string | undefined)}
-								{#if value}
-									<div class="flex items-center justify-between gap-4 py-2.5">
-										<dt class="text-sm text-[#888] shrink-0">{label}</dt>
-										<dd class="text-sm font-medium text-white text-right">{value}</dd>
-									</div>
-								{/if}
-							{/snippet}
-							{@render inforow('Müşteri Tipi', typeLabels[customer.companyType] ?? customer.companyType)}
+							{@render inforow('Müşteri Tip', typeLabels[customer.companyType] ?? customer.companyType)}
+							{@render inforow('Müşteri Sektör', customer.source)}
 							{@render inforow('Durum', statusConfig[customer.status]?.label ?? customer.status)}
-							{@render inforow('Kaynak', customer.source ? (sourceLabels[customer.source] ?? customer.source) : undefined)}
+						</dl>
+					</div>
+
+					<!-- Temel Bilgiler -->
+					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
+						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Temel Bilgiler</p>
+						<dl class="divide-y divide-[#2a2a2a]">
+							{@render inforow('Firma Yetkili', customer.contactName)}
+							{@render inforow('İlgili Firma', customer.companyId
+								? (authStore.companies.find(c => c.id === customer.companyId)?.name ?? customer.companyId)
+								: undefined)}
 						</dl>
 					</div>
 
@@ -590,22 +613,22 @@
 					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
 						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">İletişim</p>
 						<dl class="divide-y divide-[#2a2a2a]">
-							{#snippet inforow2(label: string, value: string | undefined)}
-								{#if value}
-									<div class="flex items-center justify-between gap-4 py-2.5">
-										<dt class="text-sm text-[#888] shrink-0">{label}</dt>
-										<dd class="text-sm font-medium text-white text-right">{value}</dd>
-									</div>
-								{/if}
-							{/snippet}
-							{@render inforow2('Yetkili', customer.contactName && customer.contactTitle
-								? `${customer.contactName} — ${customer.contactTitle}`
-								: customer.contactName)}
-							{@render inforow2('Telefon', customer.phone)}
-							{@render inforow2('E-posta', customer.email)}
-							{@render inforow2('Şehir', customer.city)}
-							{@render inforow2('Ülke', customer.country)}
-							{@render inforow2('Adres', customer.address)}
+							{@render inforow('Telefon (Mobil)', customer.phone)}
+							{@render inforow('Telefon (Sabit)', customer.phoneLandline)}
+							{@render inforow('E-Posta', customer.email)}
+							{@render inforow('Website', customer.website)}
+						</dl>
+					</div>
+
+					<!-- Adres -->
+					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
+						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Adres</p>
+						<dl class="divide-y divide-[#2a2a2a]">
+							{@render inforow('Ülke', customer.country)}
+							{@render inforow('İl', customer.state)}
+							{@render inforow('Şehir / İlçe', customer.city)}
+							{@render inforow('Fatura Adresi', customer.address)}
+							{@render inforow('Teslimat Adresi', customer.deliveryAddress)}
 						</dl>
 					</div>
 
@@ -613,16 +636,9 @@
 					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
 						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Sistem</p>
 						<dl class="divide-y divide-[#2a2a2a]">
-							{#snippet inforow3(label: string, value: string | undefined)}
-								{#if value}
-									<div class="flex items-center justify-between gap-4 py-2.5">
-										<dt class="text-sm text-[#888] shrink-0">{label}</dt>
-										<dd class="text-sm font-medium text-white text-right">{value}</dd>
-									</div>
-								{/if}
-							{/snippet}
-							{@render inforow3('Vergi No', customer.taxNumber)}
-							{@render inforow3('Oluşturulma', formatDate(customer.createdAt))}
+							{@render inforow('Vergi No', customer.taxNumber)}
+							{@render inforow('Vergi Dairesi', customer.contactTitle)}
+							{@render inforow('Oluşturulma', formatDate(customer.createdAt))}
 						</dl>
 					</div>
 				</div>
@@ -702,8 +718,9 @@
 				{#if showQuoteForm}
 					<QuoteForm
 						{customerId}
-						onClose={() => (showQuoteForm = false)}
-						onSaved={() => (showQuoteForm = false)}
+						editQuote={editingQuote}
+						onClose={() => { showQuoteForm = false; editingQuote = null; }}
+						onSaved={() => { showQuoteForm = false; editingQuote = null; }}
 					/>
 				{:else}
 					<div class="max-w-2xl">
@@ -711,7 +728,7 @@
 							<p class="text-sm text-[#888]">{quotes.length} teklif</p>
 							<button
 								type="button"
-								onclick={() => (showQuoteForm = true)}
+								onclick={() => { editingQuote = null; showQuoteForm = true; }}
 								class="flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-black transition hover:bg-[#e0e0e0]"
 							>
 								<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
@@ -725,7 +742,7 @@
 								<p class="text-sm text-[#888]">Henüz teklif oluşturulmamış.</p>
 								<button
 									type="button"
-									onclick={() => (showQuoteForm = true)}
+									onclick={() => { editingQuote = null; showQuoteForm = true; }}
 									class="mt-3 text-sm text-white underline underline-offset-2"
 								>İlk teklifi oluştur</button>
 							</div>
@@ -733,6 +750,7 @@
 							<div class="flex flex-col gap-2">
 								{#each quotes as quote (quote.id)}
 									{@const qsc = statusConfig[quote.status]}
+									{@const isOwner = quote.createdBy === userId}
 									<div class="flex items-center justify-between rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-5 py-4">
 										<div>
 											<p class="text-sm font-bold text-white">{quote.quoteNumber}</p>
@@ -743,6 +761,16 @@
 											{#if qsc}
 												<Badge variant={qsc.variant} label={qsc.label} />
 											{/if}
+											<button
+												type="button"
+												disabled={!isOwner}
+												onclick={() => { editingQuote = quote; showQuoteForm = true; }}
+												title={isOwner ? 'Düzenle' : 'Sadece kendi tekliflerinizi düzenleyebilirsiniz'}
+												class="flex h-7 items-center rounded-lg border px-2 text-xs transition
+													{isOwner
+														? 'border-[#2a2a2a] text-[#666] hover:border-[#444] hover:text-white'
+														: 'border-[#1e1e1e] text-[#333] cursor-not-allowed opacity-40'}"
+											>Düzenle</button>
 											<button
 												type="button"
 												onclick={() => openDetailModal('quote', quote)}
