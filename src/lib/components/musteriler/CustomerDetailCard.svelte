@@ -25,7 +25,6 @@
 	type CustomerRow = {
 		id: string;
 		name: string;
-		companyId?: string;
 		companyType: string;
 		status: string;
 		source?: string;
@@ -67,7 +66,6 @@
 		exchangeRate?: number;
 		createdAt: number;
 		createdBy: string;
-		companyId?: string;
 		deliveryType?: string;
 		deliveryFirm?: string;
 		deliveryPayment?: string;

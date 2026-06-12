@@ -172,6 +172,14 @@ const rules = {
 			delete: 'false',
 			update: 'auth.id != null'
 		}
+	},
+	$users: {
+		allow: {
+			view: 'auth.id != null',
+			create: 'auth.id != null',
+			update: 'auth.id != null',
+			delete: 'false'
+		}
 	}
 } satisfies InstantRules;
 

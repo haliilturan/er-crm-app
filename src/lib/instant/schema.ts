@@ -94,7 +94,6 @@ const schema = i.schema({
 			source: i.string().optional(),
 			contactName: i.string().optional(),
 			contactTitle: i.string().optional(),
-			companyId: i.string().indexed(),
 			assignedTo: i.string().indexed(),
 			createdBy: i.string(),
 			createdAt: i.number().indexed(),
@@ -516,10 +515,6 @@ const schema = i.schema({
 
 		// ─── Müşteriler ─────────────────────────────────────────────────────────
 
-		customerOrg: {
-			forward: { on: 'customers', has: 'one', label: 'company' },
-			reverse: { on: 'companies', has: 'many', label: 'customers' }
-		},
 		customerAssignee: {
 			forward: { on: 'customers', has: 'one', label: 'assignee' },
 			reverse: { on: 'userProfiles', has: 'many', label: 'assignedCustomers' }

@@ -93,16 +93,11 @@
 	});
 
 	// ── Subscription ─────────────────────────────────────────────────────────
-	// Single subscription over all company customers.
-	// companyId is indexed so this query is efficient.
 	// updatedBy / updatedAt are not indexed → all sorting/filtering in JS.
 	$effect(() => {
-		const cId = authStore.activeCompanyId;
-		if (!cId) { loading = false; return; }
-
 		loading = true;
 		return db.subscribeQuery(
-			{ customers: { $: { where: { companyId: cId } } } },
+			{ customers: { $: { order: { createdAt: 'desc' } } } },
 			(res) => {
 				untrack(() => {
 					if (res.isLoading) return;

@@ -18,7 +18,6 @@
 	type FormData = {
 		name: string;
 		contactName: string;
-		companyId: string;
 		companyType: string;
 		source: string;
 		address: string;
@@ -80,10 +79,9 @@
 	let selectedCountryIso2 = $state('TR');
 	let selectedStateId = $state('');
 	let cityOptions = $state<Array<{ value: string; label: string }>>([]);
-	let companies = $state<Array<{ id: string; name: string }>>([]);
 
 	const EMPTY_FORM: FormData = {
-		name: '', contactName: '', companyId: '',
+		name: '', contactName: '',
 		companyType: 'Lead', source: '',
 		address: '', state: '', city: '', deliveryAddress: '',
 		phone: '', phoneLandline: '', email: '',
@@ -105,10 +103,6 @@
 	);
 
 	let stateLabel = $derived(selectedCountryIso2 === 'TR' ? 'İl' : 'Eyalet / Bölge');
-
-	let companyOptions = $derived(
-		companies.map((c) => ({ value: c.id, label: c.name }))
-	);
 
 	let formValid = $derived(
 		form.name.trim().length > 0 &&
@@ -140,18 +134,6 @@
 			.replace(/ö/g, 'o')
 			.replace(/ç/g, 'c');
 	}
-
-	// ─── Companies Subscription ───────────────────────────────────────────────
-	$effect(() => {
-		return db.subscribeQuery(
-			{ companies: { $: { where: { isActive: true } } } },
-			(res) => {
-				untrack(() => {
-					companies = (res.data?.companies ?? []) as Array<{ id: string; name: string }>;
-				});
-			}
-		);
-	});
 
 	// ─── Init ─────────────────────────────────────────────────────────────────
 	onMount(() => {
@@ -192,7 +174,6 @@
 						form = {
 							name:            String(c.name            ?? ''),
 							contactName:     String(c.contactName     ?? ''),
-							companyId:       String(c.companyId       ?? ''),
 							companyType:     String(c.companyType     ?? 'Lead'),
 							source:          String(c.source          ?? ''),
 							address:         String(c.address         ?? ''),
@@ -232,8 +213,6 @@
 		if (!formValid) return;
 
 		const userId = authStore.userId;
-		const companyId = form.companyId || authStore.activeCompanyId;
-		if (!companyId) { saveError = 'Şirket seçilmedi.'; return; }
 		if (!userId) { saveError = 'Oturum bilgisi yüklenemedi.'; return; }
 
 		saving = true;
@@ -267,7 +246,6 @@
 				await db.transact([
 					tx.customers[newId].update({
 						...body,
-						companyId,
 						assignedTo: userId,
 						createdBy:  userId,
 						createdAt:  Date.now(),
