@@ -466,7 +466,7 @@
 				</div>
 
 				<div class="modal-meta">
-					<span class="meta-badge status-{o.status}">{ORDER_STATUS[o.status] ?? o.status}</span>
+					<span class="meta-badge status-{o.status}">{ORDER_STATUS[o.status]?.label ?? o.status}</span>
 					<span class="meta-currency">{o.currency}</span>
 					{#if o.notes}
 						<span class="meta-notes">{o.notes}</span>
