@@ -2,7 +2,8 @@
 	import { untrack } from 'svelte';
 	import { db, id, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { Badge, SectionHead, Modal, TextInput, TextArea, NumberInput } from '$lib/components/ui';
+	import { Badge, SectionHead, Modal, TextArea, NumberInput } from '$lib/components/ui';
+	import { refreshRates } from '$lib/services/rates';
 
 	// ── Types ──────────────────────────────────────────────────────────────────
 
@@ -36,9 +37,10 @@
 	let companyId = $derived(authStore.activeCompanyId ?? '');
 
 	// Modal
-	let modalOpen    = $state(false);
-	let activeOrder  = $state<Order | null>(null);
-	let payAmount    = $state(0);
+	let modalOpen     = $state(false);
+	let activeOrderId = $state<string | null>(null);
+	let activeOrder   = $derived(orders.find(o => o.id === activeOrderId) ?? null);
+	let payAmount     = $state(0);
 	let payCurrency  = $state('TRY');
 	let payDateStr   = $state('');
 	let payNote      = $state('');
@@ -106,8 +108,8 @@
 	// ── Open modal ────────────────────────────────────────────────────────────
 
 	function openModal(order: Order) {
-		activeOrder = order;
-		payAmount   = 0;
+		activeOrderId = order.id;
+		payAmount     = 0;
 		payCurrency = order.currency ?? 'TRY';
 		payDateStr  = todayStr();
 		payNote     = '';
@@ -121,6 +123,7 @@
 		if (!activeOrder || saving || payAmount <= 0) return;
 		saving   = true;
 		errorMsg = '';
+		await refreshRates();
 		try {
 			const payId    = id();
 			const now      = Date.now();

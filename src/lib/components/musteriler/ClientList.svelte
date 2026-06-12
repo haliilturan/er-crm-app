@@ -118,7 +118,7 @@
 	const latest100 = $derived.by((): RawCustomer[] => {
 		const uid  = authStore.userId ?? '';
 		const byMe = rawCustomers
-			.filter((c) => c.updatedBy === uid)
+			.filter((c) => c.updatedBy === uid || c.createdBy === uid)
 			.sort((a, b) => (b.updatedAt ?? 0) - (a.updatedAt ?? 0))
 			.slice(0, 100);
 

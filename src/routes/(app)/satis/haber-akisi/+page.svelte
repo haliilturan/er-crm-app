@@ -44,37 +44,22 @@
 		items?: LineItem[];
 	};
 
-	type FeedQuote = {
-		id: string;
-		quoteNumber: string;
-		customerId: string;
-		companyId: string;
-		totalWithVat: number;
-		subtotal: number;
-		totalVat: number;
-		currency: string;
-		status: string;
-		createdBy: string;
-		createdAt: number;
-		notes?: string;
-		customer?: { id: string; name: string };
-		items?: LineItem[];
-	};
-
 	type UC = { id: string; userId: string; profile?: Profile };
 
 	// ── State ──────────────────────────────────────────────────────────────────
 
 	let orders           = $state<FeedOrder[]>([]);
-	let quotes           = $state<FeedQuote[]>([]);
 	let profileByUserId  = $state<Record<string, Profile>>({});
 	let loading          = $state(true);
 	let companyId        = $derived(authStore.activeCompanyId ?? '');
 
+	let teklifler  = $derived(orders.filter(o => ['draft', 'pending_finance'].includes(o.status)));
+	let siparisler = $derived(orders.filter(o => ['in_production', 'shipped', 'completed', 'cancelled'].includes(o.status)));
+
 	// Modal state
 	let modalOpen   = $state(false);
 	let modalType   = $state<'order' | 'quote'>('order');
-	let modalData   = $state<FeedOrder | FeedQuote | null>(null);
+	let modalData   = $state<FeedOrder | null>(null);
 
 	// ── Subscription ──────────────────────────────────────────────────────────
 
@@ -85,11 +70,6 @@
 		return db.subscribeQuery(
 			{
 				orders: {
-					$: { where: { companyId: cId }, order: { createdAt: 'desc' } },
-					customer: {},
-					items: {}
-				},
-				quotes: {
 					$: { where: { companyId: cId }, order: { createdAt: 'desc' } },
 					customer: {},
 					items: {}
@@ -106,7 +86,6 @@
 						ucs.filter((uc) => !!uc.profile).map((uc) => [uc.userId, uc.profile!])
 					);
 					orders  = (result.data?.orders ?? []) as FeedOrder[];
-					quotes  = (result.data?.quotes ?? []) as FeedQuote[];
 					loading = false;
 				});
 			}
@@ -140,17 +119,16 @@
 	type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'default';
 
 	const QUOTE_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
-		draft:           { label: 'Taslak',          variant: 'default'  },
-		pending_finance: { label: 'Finans Bekliyor',  variant: 'warning'  },
-		approved:        { label: 'Onaylı',           variant: 'success'  },
-		rejected:        { label: 'Reddedildi',       variant: 'danger'   },
-		cancelled:       { label: 'İptal',            variant: 'danger'   }
+		draft:           { label: 'Taslak',          variant: 'default' },
+		pending_finance: { label: 'Finans Bekliyor', variant: 'warning' },
+		cancelled:       { label: 'İptal',           variant: 'danger'  }
 	};
 
 	const ORDER_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
-		active:    { label: 'Aktif',       variant: 'info'    },
-		completed: { label: 'Tamamlandı',  variant: 'success' },
-		cancelled: { label: 'İptal',       variant: 'danger'  }
+		in_production: { label: 'Üretimde',    variant: 'info'    },
+		shipped:       { label: 'Kargoda',     variant: 'info'    },
+		completed:     { label: 'Tamamlandı',  variant: 'success' },
+		cancelled:     { label: 'İptal',       variant: 'danger'  }
 	};
 
 	const PAYMENT_STATUS: Record<string, { label: string; variant: BadgeVariant }> = {
@@ -163,7 +141,7 @@
 		return map[key ?? ''] ?? { label: key ?? '—', variant: 'default' as BadgeVariant };
 	}
 
-	function openModal(type: 'order' | 'quote', data: FeedOrder | FeedQuote) {
+	function openModal(type: 'order' | 'quote', data: FeedOrder) {
 		modalType = type;
 		modalData = data;
 		modalOpen = true;
@@ -197,7 +175,7 @@
 				<span class="w-2 h-2 rounded-full bg-emerald-500 shrink-0"></span>
 				<h3 class="text-sm font-semibold text-white">Siparişler</h3>
 				{#if !loading}
-					<span class="ml-auto text-xs text-gray-500">{orders.length}</span>
+					<span class="ml-auto text-xs text-gray-500">{siparisler.length}</span>
 				{/if}
 			</div>
 
@@ -206,12 +184,12 @@
 					{#each [1, 2, 3, 4] as _, i (i)}
 						<div class="h-[130px] bg-[#141414] animate-pulse border-b border-[#1a1a1a]"></div>
 					{/each}
-				{:else if orders.length === 0}
+				{:else if siparisler.length === 0}
 					<div class="flex h-40 items-center justify-center text-xs text-gray-500">
 						Henüz sipariş yok
 					</div>
 				{:else}
-					{#each orders as order (order.id)}
+					{#each siparisler as order (order.id)}
 						{@const p    = profileOf(order.createdBy)}
 						{@const name = displayName(p)}
 						{@const cust = order.customer?.name ?? order.customerName ?? 'Müşteri'}
@@ -273,7 +251,7 @@
 				<span class="w-2 h-2 rounded-full bg-amber-400 shrink-0"></span>
 				<h3 class="text-sm font-semibold text-white">Teklifler</h3>
 				{#if !loading}
-					<span class="ml-auto text-xs text-gray-500">{quotes.length}</span>
+					<span class="ml-auto text-xs text-gray-500">{teklifler.length}</span>
 				{/if}
 			</div>
 
@@ -282,12 +260,12 @@
 					{#each [1, 2, 3, 4] as _, i (i)}
 						<div class="h-[130px] bg-[#141414] animate-pulse border-b border-[#1a1a1a]"></div>
 					{/each}
-				{:else if quotes.length === 0}
+				{:else if teklifler.length === 0}
 					<div class="flex h-40 items-center justify-center text-xs text-gray-500">
 						Henüz teklif yok
 					</div>
 				{:else}
-					{#each quotes as quote (quote.id)}
+					{#each teklifler as quote (quote.id)}
 						{@const p    = profileOf(quote.createdBy)}
 						{@const name = displayName(p)}
 						{@const cust = quote.customer?.name ?? 'Müşteri'}
@@ -445,7 +423,7 @@
 				{/if}
 
 			{:else}
-				{@const q  = modalData as FeedQuote}
+				{@const q  = modalData as FeedOrder}
 				{@const sb = statusBadge(QUOTE_STATUS, q.status)}
 				{@const lines = sortedItems(q.items)}
 
@@ -453,7 +431,7 @@
 				<div class="grid grid-cols-2 gap-3 mb-5">
 					<div>
 						<p class="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Teklif No</p>
-						<p class="text-sm font-mono font-semibold text-white">{q.quoteNumber ?? '—'}</p>
+						<p class="text-sm font-mono font-semibold text-white">{q.orderNumber ?? '—'}</p>
 					</div>
 					<div>
 						<p class="text-[10px] text-gray-500 uppercase tracking-wider mb-0.5">Tarih</p>

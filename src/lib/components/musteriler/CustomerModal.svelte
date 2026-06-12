@@ -40,7 +40,8 @@
 		{ value: 'Client',        label: 'Client'        },
 		{ value: 'Son Kullanıcı', label: 'Son Kullanıcı' },
 		{ value: 'Aracı',         label: 'Aracı'         },
-		{ value: 'Tüccar',        label: 'Tüccar'        }
+		{ value: 'Tüccar',        label: 'Tüccar'        },
+		{ value: 'Soğuk İletişim', label: 'Soğuk İletişim' }
 	];
 
 	const SECTOR_OPTIONS = [
@@ -269,7 +270,9 @@
 						companyId,
 						assignedTo: userId,
 						createdBy:  userId,
-						createdAt:  Date.now()
+						createdAt:  Date.now(),
+						updatedBy:  userId,
+						updatedAt:  Date.now()
 					})
 				]);
 			} else {
@@ -350,13 +353,6 @@
 					placeholder="Yetkili kişi adı"
 					required
 					error={attempted && !form.contactName.trim() ? 'Bu alan zorunludur.' : ''}
-				/>
-
-				<Select
-					label="İlgili Firma"
-					bind:value={form.companyId}
-					options={companyOptions}
-					placeholder="Firma seçin"
 				/>
 
 				<Select

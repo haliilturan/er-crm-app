@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { untrack } from 'svelte';
 	import { db, id as genId, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { Modal, Select, TextInput, TextArea, NumberInput } from '$lib/components/ui';
@@ -7,7 +8,7 @@
 		id: string;
 		name: string;
 		sku: string;
-		firm: string;
+		brandName: string;
 		category: string;
 	};
 
@@ -16,9 +17,15 @@
 		name?: string;
 		sku?: string;
 		firm?: string;
+		brandName?: string;
 		category?: string;
 		applicationArea?: string;
 		description?: string;
+		descTR?: string;
+		descEN?: string;
+		descRU?: string;
+		descAR?: string;
+		descFR?: string;
 		photo?: string;
 		technicalDrawing?: string;
 		technicalDescription?: string;
@@ -47,6 +54,11 @@
 		highPotential?: boolean;
 		urgentProduction?: boolean;
 		orderQuantity?: number;
+		baseWidth?: number;
+		baseLength?: number;
+		baseHeight?: number;
+		holeDistanceX?: number;
+		holeDistanceY?: number;
 	};
 
 	let {
@@ -62,6 +74,7 @@
 		quoteSourceProduct = null,
 		onAddToQuote = undefined,
 		onSaveAndAdd = undefined,
+		draftMode = false,
 	}: {
 		open: boolean;
 		companyId: string;
@@ -75,9 +88,23 @@
 		quoteSourceProduct?: EditableProduct | null;
 		onAddToQuote?: () => void;
 		onSaveAndAdd?: (p: SavedProduct) => void;
+		draftMode?: boolean;
 	} = $props();
 
-	const FIRMS = ['Euromak', 'Hilal Fırça', 'Mix7', 'Teknocall', 'Teksa'];
+	let brands = $state<{ id: string; name: string }[]>([]);
+
+	$effect(() => {
+		const cId = companyId;
+		if (!cId) return;
+		return db.subscribeQuery(
+			{ brands: { $: { where: { companyId: cId }, order: { name: 'asc' } } } },
+			(res) => {
+				untrack(() => {
+					brands = (res.data?.brands ?? []) as { id: string; name: string }[];
+				});
+			}
+		);
+	});
 
 	const CATEGORIES = [
 		'Silindir Fırçalar', 'Dairesel Fırçalar', 'Panel Fırçalar', 'Şerit Fırçalar',
@@ -127,10 +154,16 @@
 	let productId        = $state(genId());
 	let sku              = $state('');
 	let name             = $state('');
-	let firm             = $state('');
+	let brandName        = $state('');
 	let category         = $state('');
 	let applicationArea  = $state('');
 	let description      = $state('');
+	let descTR           = $state('');
+	let descEN           = $state('');
+	let descRU           = $state('');
+	let descAR           = $state('');
+	let descFR           = $state('');
+	let activeDescLangs  = $state<string[]>(['TR']);
 	let photo            = $state('');
 	let technicalDrawing = $state('');
 	let technicalDescr   = $state('');
@@ -163,6 +196,11 @@
 	let highPotential        = $state(false);
 	let urgentProduction     = $state(false);
 	let orderQuantity        = $state(0);
+	let baseWidth            = $state(0);
+	let baseLength           = $state(0);
+	let baseHeight           = $state(0);
+	let holeDistanceX        = $state(0);
+	let holeDistanceY        = $state(0);
 
 	const isDirty = $derived.by(() => {
 		if (!quoteMode || !quoteSourceProduct) return false;
@@ -170,10 +208,15 @@
 		return (
 			name.trim()            !== (src.name                  ?? '').trim()  ||
 			sku.trim()             !== (src.sku                   ?? '').trim()  ||
-			firm                   !== (src.firm                  ?? '')         ||
+			brandName.trim()       !== (src.brandName             ?? '').trim() ||
 			category               !== (src.category              ?? '')         ||
 			applicationArea.trim() !== (src.applicationArea       ?? '').trim() ||
 			description.trim()     !== (src.description           ?? '').trim() ||
+			descTR.trim()          !== (src.descTR                ?? '').trim() ||
+			descEN.trim()          !== (src.descEN                ?? '').trim() ||
+			descRU.trim()          !== (src.descRU                ?? '').trim() ||
+			descAR.trim()          !== (src.descAR                ?? '').trim() ||
+			descFR.trim()          !== (src.descFR                ?? '').trim() ||
 			technicalDescr.trim()  !== (src.technicalDescription  ?? '').trim() ||
 			productType            !== (src.type === 'custom' ? 'custom' : 'ready') ||
 			brushType              !== (src.brushType             ?? '')         ||
@@ -199,6 +242,11 @@
 			highPotential          !== (src.highPotential         ?? false)      ||
 			urgentProduction       !== (src.urgentProduction      ?? false)      ||
 			orderQuantity          !== (src.orderQuantity         ?? 0)          ||
+			baseWidth              !== (src.baseWidth             ?? 0)          ||
+			baseLength             !== (src.baseLength            ?? 0)          ||
+			baseHeight             !== (src.baseHeight            ?? 0)          ||
+			holeDistanceX          !== (src.holeDistanceX         ?? 0)          ||
+			holeDistanceY          !== (src.holeDistanceY         ?? 0)          ||
 			photo                  !== (src.photo                 ?? '')         ||
 			technicalDrawing       !== (src.technicalDrawing      ?? '')
 		);
@@ -234,10 +282,16 @@
 			productId            = genId();
 			sku                  = '';
 			name                 = '';
-			firm                 = '';
+			brandName            = '';
 			category             = '';
 			applicationArea      = '';
 			description          = '';
+			descTR               = '';
+			descEN               = '';
+			descRU               = '';
+			descAR               = '';
+			descFR               = '';
+			activeDescLangs      = ['TR'];
 			photo                = '';
 			technicalDrawing     = '';
 			technicalDescr       = '';
@@ -268,6 +322,11 @@
 			highPotential        = false;
 			urgentProduction     = false;
 			orderQuantity        = 0;
+			baseWidth            = 0;
+			baseLength           = 0;
+			baseHeight           = 0;
+			holeDistanceX        = 0;
+			holeDistanceY        = 0;
 		}
 	});
 
@@ -276,10 +335,15 @@
 			productId            = genId();
 			name                 = deriveProduct.name             ?? '';
 			sku                  = 'COPY-' + genId().slice(0, 8).toUpperCase();
-			firm                 = deriveProduct.firm             ?? '';
+			brandName            = deriveProduct.brandName         ?? deriveProduct.firm ?? '';
 			category             = deriveProduct.category         ?? '';
 			applicationArea      = deriveProduct.applicationArea  ?? '';
 			description          = deriveProduct.description      ?? '';
+			descTR               = deriveProduct.descTR           ?? '';
+			descEN               = deriveProduct.descEN           ?? '';
+			descRU               = deriveProduct.descRU           ?? '';
+			descAR               = deriveProduct.descAR           ?? '';
+			descFR               = deriveProduct.descFR           ?? '';
 			photo                = deriveProduct.photo            ?? '';
 			technicalDrawing     = deriveProduct.technicalDrawing ?? '';
 			technicalDescr       = deriveProduct.technicalDescription ?? '';
@@ -307,6 +371,11 @@
 			highPotential        = deriveProduct.highPotential        ?? false;
 			urgentProduction     = deriveProduct.urgentProduction     ?? false;
 			orderQuantity        = deriveProduct.orderQuantity        ?? 0;
+			baseWidth            = deriveProduct.baseWidth            ?? 0;
+			baseLength           = deriveProduct.baseLength           ?? 0;
+			baseHeight           = deriveProduct.baseHeight           ?? 0;
+			holeDistanceX        = deriveProduct.holeDistanceX        ?? 0;
+			holeDistanceY        = deriveProduct.holeDistanceY        ?? 0;
 			if (deriveProduct.includedParts) {
 				try {
 					const parsed = JSON.parse(deriveProduct.includedParts) as Array<{ name: string; quantity: number; type?: string }>;
@@ -338,10 +407,21 @@
 			productId            = genId();
 			name                 = src.name                  ?? '';
 			sku                  = src.sku                   ?? '';
-			firm                 = src.firm                  ?? '';
+			brandName            = src.brandName               ?? src.firm ?? '';
 			category             = src.category              ?? '';
 			applicationArea      = src.applicationArea       ?? '';
 			description          = src.description           ?? '';
+			descTR               = src.descTR                ?? '';
+			descEN               = src.descEN                ?? '';
+			descRU               = src.descRU                ?? '';
+			descAR               = src.descAR                ?? '';
+			descFR               = src.descFR                ?? '';
+			activeDescLangs      = ['TR',
+				...(src.descEN ? ['EN'] : []),
+				...(src.descRU ? ['RU'] : []),
+				...(src.descAR ? ['AR'] : []),
+				...(src.descFR ? ['FR'] : []),
+			];
 			photo                = src.photo                 ?? '';
 			technicalDrawing     = src.technicalDrawing      ?? '';
 			technicalDescr       = src.technicalDescription  ?? '';
@@ -369,6 +449,11 @@
 			highPotential        = src.highPotential         ?? false;
 			urgentProduction     = src.urgentProduction      ?? false;
 			orderQuantity        = src.orderQuantity         ?? 0;
+			baseWidth            = src.baseWidth             ?? 0;
+			baseLength           = src.baseLength            ?? 0;
+			baseHeight           = src.baseHeight            ?? 0;
+			holeDistanceX        = src.holeDistanceX         ?? 0;
+			holeDistanceY        = src.holeDistanceY         ?? 0;
 			if (src.includedParts) {
 				try {
 					const parsed = JSON.parse(src.includedParts) as Array<{ name: string; quantity: number; type?: string }>;
@@ -392,10 +477,15 @@
 			productId            = editProduct.id;
 			name                 = editProduct.name             ?? '';
 			sku                  = editProduct.sku              ?? '';
-			firm                 = editProduct.firm             ?? '';
+			brandName            = editProduct.brandName         ?? editProduct.firm ?? '';
 			category             = editProduct.category         ?? '';
 			applicationArea      = editProduct.applicationArea  ?? '';
 			description          = editProduct.description      ?? '';
+			descTR               = editProduct.descTR           ?? '';
+			descEN               = editProduct.descEN           ?? '';
+			descRU               = editProduct.descRU           ?? '';
+			descAR               = editProduct.descAR           ?? '';
+			descFR               = editProduct.descFR           ?? '';
 			photo                = editProduct.photo            ?? '';
 			technicalDrawing     = editProduct.technicalDrawing ?? '';
 			technicalDescr       = editProduct.technicalDescription ?? '';
@@ -423,6 +513,11 @@
 			highPotential        = editProduct.highPotential        ?? false;
 			urgentProduction     = editProduct.urgentProduction     ?? false;
 			orderQuantity        = editProduct.orderQuantity        ?? 0;
+			baseWidth            = editProduct.baseWidth            ?? 0;
+			baseLength           = editProduct.baseLength           ?? 0;
+			baseHeight           = editProduct.baseHeight           ?? 0;
+			holeDistanceX        = editProduct.holeDistanceX        ?? 0;
+			holeDistanceY        = editProduct.holeDistanceY        ?? 0;
 			if (editProduct.includedParts) {
 				try {
 					const parsed = JSON.parse(editProduct.includedParts) as Array<{ name: string; quantity: number; type?: string }>;
@@ -453,20 +548,25 @@
 		parts = parts.map((p, i) => i === idx ? { ...p, partType: val } : p);
 	}
 
-	function addToQuote() {
-		onAddToQuote?.();
-		onclose();
+	async function addToQuote() {
+		if (quoteMode && !quoteSourceProduct) {
+			await save();
+		} else {
+			onAddToQuote?.();
+			onclose();
+		}
 	}
 
 	async function saveAndAdd() {
 		if (!isDirty || !quoteSourceProduct) return;
 		if (!name.trim()) { errorMsg = 'Ürün adı zorunludur.'; return; }
+		if (!sku.trim())  { errorMsg = 'SKU zorunludur.'; return; }
 		const pid = productId.trim();
 		if (!pid) { errorMsg = 'Ürün ID boş olamaz.'; return; }
 		saving   = true;
 		errorMsg = '';
 		try {
-			const skuVal = 'COPY-' + pid.slice(0, 8).toUpperCase();
+			const skuVal = sku.trim();
 			const validParts = parts.filter((p) => p.name.trim());
 			const includedParts = validParts.length
 				? JSON.stringify(validParts.map((p) => ({ name: p.name.trim(), quantity: p.quantity, type: p.partType })))
@@ -477,10 +577,15 @@
 					name:                 name.trim(),
 					nameSearch:           normalize(name.trim()),
 					sku:                  skuVal,
-					firm:                 firm                    || undefined,
+					brandName:            brandName.trim()        || undefined,
 					category:             category                || undefined,
 					applicationArea:      applicationArea.trim()  || undefined,
 					description:          description.trim()      || undefined,
+					descTR:               descTR.trim()           || undefined,
+					descEN:               descEN.trim()           || undefined,
+					descRU:               descRU.trim()           || undefined,
+					descAR:               descAR.trim()           || undefined,
+					descFR:               descFR.trim()           || undefined,
 					photo:                photo                   || undefined,
 					technicalDrawing:     technicalDrawing        || undefined,
 					technicalDescription: technicalDescr.trim()   || undefined,
@@ -517,10 +622,15 @@
 						highPotential:        highPotential                   || undefined,
 						urgentProduction:     urgentProduction                || undefined,
 						orderQuantity:        orderQuantity > 0               ? orderQuantity        : undefined,
+						baseWidth:            baseWidth > 0                   ? baseWidth            : undefined,
+						baseLength:           baseLength > 0                  ? baseLength           : undefined,
+						baseHeight:           baseHeight > 0                  ? baseHeight           : undefined,
+						holeDistanceX:        holeDistanceX > 0               ? holeDistanceX        : undefined,
+						holeDistanceY:        holeDistanceY > 0               ? holeDistanceY        : undefined,
 					} : {})
 				})
 			]);
-			onSaveAndAdd?.({ id: pid, name: name.trim(), sku: skuVal, firm, category });
+			onSaveAndAdd?.({ id: pid, name: name.trim(), sku: skuVal, brandName: brandName.trim(), category });
 			onclose();
 		} catch (err) {
 			console.error('[ProductFormModal] saveAndAdd error:', err);
@@ -532,12 +642,13 @@
 
 	async function save() {
 		if (!name.trim()) { errorMsg = 'Ürün adı zorunludur.'; return; }
+		if (!sku.trim() && !draftMode) { errorMsg = 'SKU zorunludur.'; return; }
 		const pid = productId.trim();
 		if (!pid) { errorMsg = 'Ürün ID boş olamaz.'; return; }
 		saving   = true;
 		errorMsg = '';
 		try {
-			const skuVal = sku.trim() || `PROD-${pid.slice(0, 8).toUpperCase()}`;
+			const skuVal = sku.trim();
 			const validParts = parts.filter((p) => p.name.trim());
 			const includedParts = validParts.length
 				? JSON.stringify(validParts.map((p) => ({ name: p.name.trim(), quantity: p.quantity, type: p.partType })))
@@ -548,16 +659,21 @@
 					name:                 name.trim(),
 					nameSearch:           normalize(name.trim()),
 					sku:                  skuVal,
-					firm:                 firm                    || undefined,
+					brandName:            brandName.trim()        || undefined,
 					category:             category                || undefined,
 					applicationArea:      applicationArea.trim()  || undefined,
 					description:          description.trim()      || undefined,
+					descTR:               descTR.trim()           || undefined,
+					descEN:               descEN.trim()           || undefined,
+					descRU:               descRU.trim()           || undefined,
+					descAR:               descAR.trim()           || undefined,
+					descFR:               descFR.trim()           || undefined,
 					photo:                photo                   || undefined,
 					technicalDrawing:     technicalDrawing        || undefined,
 					technicalDescription: technicalDescr.trim()   || undefined,
 					includedParts,
 					type:      productType,
-					status:    'active',
+					status:    draftMode ? 'draft' : 'active',
 					vatRate:   20,
 					unit:      'Adet',
 					companyId,
@@ -589,10 +705,15 @@
 						highPotential:        highPotential                   || undefined,
 						urgentProduction:     urgentProduction                || undefined,
 						orderQuantity:        orderQuantity > 0               ? orderQuantity        : undefined,
+						baseWidth:            baseWidth > 0                   ? baseWidth            : undefined,
+						baseLength:           baseLength > 0                  ? baseLength           : undefined,
+						baseHeight:           baseHeight > 0                  ? baseHeight           : undefined,
+						holeDistanceX:        holeDistanceX > 0               ? holeDistanceX        : undefined,
+						holeDistanceY:        holeDistanceY > 0               ? holeDistanceY        : undefined,
 					} : {})
 				})
 			]);
-			onSaved({ id: pid, name: name.trim(), sku: skuVal, firm, category });
+			onSaved({ id: pid, name: name.trim(), sku: skuVal, brandName: brandName.trim(), category });
 			onclose();
 		} catch (err) {
 			console.error('[ProductFormModal] save error:', err);
@@ -608,8 +729,8 @@
 	<div class="shrink-0 border-b border-[#2a2a2a]">
 		<div class="flex items-center justify-between px-5 pt-4 pb-3">
 			<div>
-				<p class="text-sm font-semibold text-white">{quoteMode ? 'Ürün İncele' : deriveProduct ? 'Ürün Türet' : editProduct ? 'Ürün Düzenle' : 'Ürün Ekle'}</p>
-				<p class="text-xs text-[#555] mt-0.5">{quoteMode ? 'Düzenleyip taslak olarak da kaydedebilirsiniz' : deriveProduct ? `Kaynak: ${deriveProduct.id.slice(0, 8)}…` : editProduct ? `ID: ${editProduct.id.slice(0, 8)}…` : "products namespace'ine kalıcı olarak kaydedilecek"}</p>
+				<p class="text-sm font-semibold text-white">{quoteMode && quoteSourceProduct ? 'Ürün İncele' : quoteMode ? 'Elle Ürün Ekle' : deriveProduct ? 'Ürün Türet' : editProduct ? 'Ürün Düzenle' : 'Ürün Ekle'}</p>
+				<p class="text-xs text-[#555] mt-0.5">{quoteMode && quoteSourceProduct ? 'Düzenleyip taslak olarak da kaydedebilirsiniz' : quoteMode ? 'Ürün bilgilerini girin ve teklife ekleyin' : deriveProduct ? `Kaynak: ${deriveProduct.id.slice(0, 8)}…` : editProduct ? `ID: ${editProduct.id.slice(0, 8)}…` : "products namespace'ine kalıcı olarak kaydedilecek"}</p>
 			</div>
 			<button
 				type="button"
@@ -628,41 +749,36 @@
 			<div class="mb-4 rounded-lg border border-red-800 bg-red-950/50 px-3 py-2 text-xs text-red-400">{errorMsg}</div>
 		{/if}
 
-		<!-- Product type toggle -->
-		<div class="flex items-center gap-3 mb-5">
-			<span class="text-xs text-gray-500">Ürün Tipi</span>
-			<div class="flex rounded-lg border border-[#2a2a2a] overflow-hidden">
-				<button
-					type="button"
-					onclick={() => (productType = 'ready')}
-					class="{productType === 'ready' ? 'bg-white text-black' : 'text-gray-400 hover:text-white'} px-3 py-1.5 text-xs font-medium transition-colors"
-				>Hazır Ürün</button>
-				<button
-					type="button"
-					onclick={() => (productType = 'custom')}
-					class="{productType === 'custom' ? 'bg-white text-black' : 'text-gray-400 hover:text-white'} px-3 py-1.5 text-xs font-medium transition-colors border-l border-[#2a2a2a]"
-				>Özel Ürün</button>
-			</div>
-		</div>
-
 		<!-- Existing form fields -->
 		<div class="flex flex-col gap-3.5">
-			<!-- ID -->
-			<TextInput
-				label="ID (otomatik oluşturuldu, değiştirilebilir)"
-				bind:value={productId}
-				placeholder="UUID"
-			/>
-
 			<!-- SKU + Ürün Adı -->
 			<div class="grid grid-cols-2 gap-3">
-				<TextInput label="SKU / Ürün Kod" bind:value={sku} placeholder="Boş bırakılırsa otomatik" />
+				<TextInput label="SKU / Ürün Kod *" bind:value={sku} placeholder="SKU giriniz" />
 				<TextInput label="Ürün Adı *" bind:value={name} placeholder="Ürün adını girin" required />
 			</div>
 
 			<!-- Marka + Kategori -->
 			<div class="grid grid-cols-2 gap-3">
-				<Select label="Marka"    bind:value={firm}     options={FIRMS}      placeholder="Seçin..." />
+				<div class="flex flex-col gap-1">
+					<label class="text-xs text-gray-500">Marka</label>
+					{#if quoteMode && quoteSourceProduct}
+						<p class="rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-gray-400">
+							{brandName || '—'}
+						</p>
+					{:else}
+						<select
+							bind:value={brandName}
+							class="w-full rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm
+								text-white focus:border-[#555] focus:outline-none
+								[&>option]:bg-[#1a1a1a] [&>option]:text-white"
+						>
+							<option value="">Seçiniz...</option>
+							{#each brands as b (b.id)}
+								<option value={b.name}>{b.name}</option>
+							{/each}
+						</select>
+					{/if}
+				</div>
 				<Select label="Kategori" bind:value={category} options={CATEGORIES} placeholder="Seçin..." />
 			</div>
 
@@ -673,8 +789,73 @@
 				placeholder="Örn: Halı yıkama makinaları için"
 			/>
 
-			<!-- Açıklama -->
-			<TextArea label="Açıklama" bind:value={description} placeholder="Ürün açıklaması..." rows={3} />
+			<!-- Açıklama (multilingual) -->
+			<div class="flex flex-col gap-1.5">
+				<span class="text-xs text-gray-500">Açıklama</span>
+				<div class="flex gap-1">
+					{#each [
+						{ code: 'TR', label: 'Türkçe'    },
+						{ code: 'EN', label: 'English'   },
+						{ code: 'RU', label: 'Русский'   },
+						{ code: 'AR', label: 'العربية'   },
+						{ code: 'FR', label: 'Français'  },
+					] as { code, label } (code)}
+						{@const active = activeDescLangs.includes(code)}
+						<button
+							type="button"
+							onclick={() => {
+								activeDescLangs = active
+									? activeDescLangs.filter(l => l !== code)
+									: [...activeDescLangs, code];
+							}}
+							class="rounded-md border px-2.5 py-1 text-[11px] font-medium transition-colors
+								{active
+									? 'border-[#444] bg-[#2a2a2a] text-white'
+									: 'border-[#2a2a2a] bg-transparent text-[#555] hover:border-[#333] hover:text-[#888]'}"
+						>{code}</button>
+					{/each}
+				</div>
+				<div class="flex flex-col gap-2">
+					{#if activeDescLangs.includes('TR')}
+						<div>
+							<p class="mb-1 text-[10px] text-[#555]">Türkçe</p>
+							<textarea bind:value={descTR} placeholder="Türkçe açıklama..." rows={2}
+								class="w-full resize-none rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none"></textarea>
+						</div>
+					{/if}
+					{#if activeDescLangs.includes('EN')}
+						<div>
+							<p class="mb-1 text-[10px] text-[#555]">English</p>
+							<textarea bind:value={descEN} placeholder="English description..." rows={2}
+								class="w-full resize-none rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none"></textarea>
+						</div>
+					{/if}
+					{#if activeDescLangs.includes('RU')}
+						<div>
+							<p class="mb-1 text-[10px] text-[#555]">Русский</p>
+							<textarea bind:value={descRU} placeholder="Описание на русском..." rows={2}
+								class="w-full resize-none rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none"></textarea>
+						</div>
+					{/if}
+					{#if activeDescLangs.includes('AR')}
+						<div>
+							<p class="mb-1 text-[10px] text-[#555]">العربية</p>
+							<textarea bind:value={descAR} placeholder="الوصف بالعربية..." rows={2} dir="rtl"
+								class="w-full resize-none rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none text-right"></textarea>
+						</div>
+					{/if}
+					{#if activeDescLangs.includes('FR')}
+						<div>
+							<p class="mb-1 text-[10px] text-[#555]">Français</p>
+							<textarea bind:value={descFR} placeholder="Description en français..." rows={2}
+								class="w-full resize-none rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none"></textarea>
+						</div>
+					{/if}
+					{#if activeDescLangs.length === 0}
+						<p class="py-1 text-[11px] text-[#444]">Dil seçmek için yukarıdaki butonları kullanın.</p>
+					{/if}
+				</div>
+			</div>
 
 			<!-- Fotoğraf + Teknik Resim -->
 			<div class="grid grid-cols-2 gap-3">
@@ -926,16 +1107,34 @@
 				</div>
 
 
-			<!-- Section 4: Taban Malzemesi -->
+			<!-- Section 4: Taban Hesaplama -->
 				<div>
-					<p class="text-sm font-bold text-white mb-2">Taban Malzemesi</p>
-					<Select label="" bind:value={baseMaterial} options={BASE_MATERIALS} placeholder="Lütfen Seçiniz" />
-				</div>
-
-				<!-- Section 5: Ensör Çapı -->
-				<div>
-					<p class="text-sm font-bold text-white mb-2">Ensör Çapı</p>
-					<Select label="" bind:value={encoderDiameter} options={ENCODER_DIAMETERS} placeholder="Lütfen Seçiniz" />
+					<p class="text-sm font-bold text-white mb-3">Taban Hesaplama</p>
+					<div class="grid grid-cols-4 gap-2">
+						<div class="rounded-xl border border-[#2a2a2a] bg-[#161616] p-3">
+							<p class="text-[11px] font-medium text-gray-500 mb-2">Taban Malzemesi</p>
+							<Select label="" bind:value={baseMaterial} options={BASE_MATERIALS} placeholder="Lütfen Seçiniz" />
+						</div>
+						<div class="rounded-xl border border-[#2a2a2a] bg-[#161616] p-3">
+							<p class="text-[11px] font-medium text-gray-500 mb-2">Taban Ölçüleri</p>
+							<div class="flex flex-col gap-2">
+								<NumberInput label="En mm" bind:value={baseWidth} min={0} />
+								<NumberInput label="Boy mm" bind:value={baseLength} min={0} />
+								<NumberInput label="Uzunluk mm" bind:value={baseHeight} min={0} />
+							</div>
+						</div>
+						<div class="rounded-xl border border-[#2a2a2a] bg-[#161616] p-3">
+							<p class="text-[11px] font-medium text-gray-500 mb-2">Ensör Çapı</p>
+							<Select label="" bind:value={encoderDiameter} options={ENCODER_DIAMETERS} placeholder="Lütfen Seçiniz" />
+						</div>
+						<div class="rounded-xl border border-[#2a2a2a] bg-[#161616] p-3">
+							<p class="text-[11px] font-medium text-gray-500 mb-2">Delik Mesafesi</p>
+							<div class="flex flex-col gap-2">
+								<NumberInput label="Yatay mm" bind:value={holeDistanceX} min={0} />
+								<NumberInput label="Dikey mm" bind:value={holeDistanceY} min={0} />
+							</div>
+						</div>
+					</div>
 				</div>
 
 				<!-- Section 6: İşçilik Hesaplama -->
@@ -973,28 +1172,17 @@
 					</div>
 				</div>
 
-				<!-- Section 7: Sipariş Durumu -->
+				<!-- Section 7: Üretim Bilgileri -->
 				<div>
-					<p class="text-sm font-bold text-white">Sipariş Durumu</p>
-					<p class="text-xs text-gray-500 mt-0.5 mb-3">Siparişin detayına ilişkin değerler</p>
+					<p class="text-sm font-bold text-white">Üretim Bilgileri</p>
+					<p class="text-xs text-gray-500 mt-0.5 mb-3">Ürünün üretim önceliğine ilişkin değerler</p>
 					<div class="grid grid-cols-3 gap-2">
-						<div class="rounded-xl border border-[#2a2a2a] bg-[#161616] p-3">
-							<p class="text-[11px] font-medium text-gray-500 mb-2">Sipariş Devamı</p>
-							<label class="flex items-start gap-1.5 cursor-pointer">
-								<input type="checkbox" bind:checked={highPotential} class="mt-0.5 w-3.5 h-3.5 accent-white shrink-0" />
-								<span class="text-xs text-gray-300 leading-tight">Yüksek Potansiyel</span>
-							</label>
-						</div>
 						<div class="rounded-xl border border-[#2a2a2a] bg-[#161616] p-3">
 							<p class="text-[11px] font-medium text-gray-500 mb-2">Üretim Önceliği</p>
 							<label class="flex items-start gap-1.5 cursor-pointer">
 								<input type="checkbox" bind:checked={urgentProduction} class="mt-0.5 w-3.5 h-3.5 accent-white shrink-0" />
 								<span class="text-xs text-gray-300 leading-tight">Acil Üretim</span>
 							</label>
-						</div>
-						<div class="rounded-xl border border-[#2a2a2a] bg-[#161616] p-3">
-							<p class="text-[11px] font-medium text-gray-500 mb-2">Sipariş Adeti</p>
-							<NumberInput label="Adet" bind:value={orderQuantity} min={0} />
 						</div>
 					</div>
 				</div>
@@ -1008,6 +1196,7 @@
 	<!-- Footer -->
 	<div class="shrink-0 flex items-center justify-end gap-2 border-t border-[#2a2a2a] px-5 py-3">
 		{#if quoteMode}
+			{#if quoteSourceProduct}
 			<button
 				type="button"
 				disabled={!isDirty || saving}
@@ -1022,6 +1211,7 @@
 					Taslak Kaydet ve Ekle
 				{/if}
 			</button>
+			{/if}
 			<button
 				type="button"
 				onclick={addToQuote}

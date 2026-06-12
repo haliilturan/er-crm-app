@@ -2,11 +2,12 @@
 	import { untrack } from 'svelte';
 	import { db, id, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { Badge, SectionHead, Modal, Button, TextArea } from '$lib/components/ui';
+	import { Badge, SectionHead } from '$lib/components/ui';
+	import { refreshRates } from '$lib/services/rates';
 
 	// ── Types ──────────────────────────────────────────────────────────────────
 
-	type QuoteItem = {
+	type OrderItem = {
 		id: string;
 		productId?: string;
 		parentItemId?: string;
@@ -27,9 +28,9 @@
 		sortOrder: number;
 	};
 
-	type Quote = {
+	type Order = {
 		id: string;
-		quoteNumber: string;
+		orderNumber: string;
 		customerId: string;
 		companyId: string;
 		status: string;
@@ -37,7 +38,6 @@
 		subtotal: number;
 		totalVat: number;
 		totalWithVat: number;
-		financeStatus?: string;
 		financeApprovedAt?: number;
 		financeApprovedBy?: string;
 		deliveryType?: string;
@@ -49,14 +49,13 @@
 		createdBy: string;
 		createdAt: number;
 		customer?: { id: string; name: string };
-		items?: QuoteItem[];
+		items?: OrderItem[];
 	};
 
 	// ── State ──────────────────────────────────────────────────────────────────
 
-	let quotes     = $state<Quote[]>([]);
+	let orders     = $state<Order[]>([]);
 	let loading    = $state(true);
-	let companyId  = $derived(authStore.activeCompanyId ?? '');
 	let myFullName = $state('');
 
 	$effect(() => {
@@ -73,45 +72,33 @@
 		);
 	});
 
-	// Reject modal
-	let rejectOpen    = $state(false);
-	let rejectQuoteId = $state('');
-	let rejectReason  = $state('');
-	let saving        = $state(false);
-	let errorMsg      = $state('');
+	let saving   = $state(false);
+	let errorMsg = $state('');
 
 	// Detail modal
 	let detailOpen  = $state(false);
-	let detailQuote = $state<Quote | null>(null);
+	let detailOrder = $state<Order | null>(null);
 
-	function openDetail(q: Quote) {
-		detailQuote = q;
+	function openDetail(o: Order) {
+		detailOrder = o;
 		detailOpen  = true;
 	}
 
 	// ── Subscription ──────────────────────────────────────────────────────────
 
 	$effect(() => {
-		const cId = companyId;
-		if (!cId) return;
 		loading = true;
 		return db.subscribeQuery(
 			{
-				quotes: {
-					$: { where: { companyId: cId }, order: { createdAt: 'desc' } },
+				orders: {
+					$: { where: { status: 'pending_finance' }, order: { createdAt: 'desc' } },
 					customer: {},
 					items: {}
 				}
 			},
 			(result) => {
 				untrack(() => {
-					const all = (result.data?.quotes ?? []) as Quote[];
-					// Show only quotes pending finance review (status = pending_finance OR financeStatus = pending/null)
-					quotes = all.filter(
-						(q) =>
-							q.status === 'pending_finance' ||
-							(!q.financeStatus || q.financeStatus === 'pending')
-					);
+					orders = (result.data?.orders ?? []) as Order[];
 					loading = false;
 				});
 			}
@@ -132,142 +119,61 @@
 
 	type BadgeVariant = 'success' | 'warning' | 'danger' | 'info' | 'default';
 
-	function statusBadge(q: Quote): { label: string; variant: BadgeVariant } {
-		if (q.financeStatus === 'approved') return { label: 'Onaylı',   variant: 'success' };
-		if (q.financeStatus === 'rejected') return { label: 'Reddedildi', variant: 'danger' };
-		if (q.status === 'pending_finance') return { label: 'Finans Bekliyor', variant: 'warning' };
+	function statusBadge(o: Order): { label: string; variant: BadgeVariant } {
+		if (o.status === 'pending_finance') return { label: 'Finans Bekliyor', variant: 'warning' };
 		return { label: 'İnceleniyor', variant: 'info' };
 	}
 
 	// ── Actions ───────────────────────────────────────────────────────────────
 
-	async function approveQuote(quote: Quote) {
+	async function approveOrder(order: Order) {
 		if (saving) return;
-		saving  = true;
+		saving = true;
 		errorMsg = '';
+		await refreshRates();
 		try {
-			const orderId      = id();
-			const now          = Date.now();
-			const orderNumber  = `SIP-${now.toString().slice(-8)}`;
-			const userId       = authStore.userId!;
-			const customerName = quote.customer?.name ?? '';
+			const now    = Date.now();
+			const userId = authStore.userId!;
 
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const ops: any[] = [
-				// 1. Mark quote as finance-approved
-				tx.quotes[quote.id].update({
-					financeStatus:     'approved',
+			await db.transact([
+				tx.orders[order.id].update({
+					status:            'in_production',
 					financeApprovedAt: now,
-					financeApprovedBy: userId
+					financeApprovedBy: userId,
+					paymentStatus:     'unpaid',
+					updatedBy:         userId,
+					updatedAt:         now
 				}),
-
-				// 2. Create order snapshot
-				tx.orders[orderId].update({
-					orderNumber,
-					quoteId:      quote.id,
-					customerId:   quote.customerId,
-					customerName,
-					companyId:    quote.companyId,
-					status:       'active',
-					paymentStatus: 'unpaid',
-					currency:     quote.currency,
-					subtotal:     quote.subtotal,
-					totalVat:     quote.totalVat,
-					totalWithVat: quote.totalWithVat,
-					deliveryType: quote.deliveryType,
-					paymentType:  quote.paymentType,
-					notes:        quote.notes,
-					approvedBy:   userId,
-					approvedAt:   now,
-					createdBy:    userId,
-					createdAt:    now
+				tx.orderStatusHistory[id()].update({
+					orderId:    order.id,
+					fromStatus: 'pending_finance',
+					toStatus:   'in_production',
+					changedBy:  userId,
+					changedAt:  now
 				}),
-
-				// 3. Link order → quote and customer
-				tx.orders[orderId].link({ sourceQuote: quote.id }),
-				tx.orders[orderId].link({ customer: quote.customerId }),
-
-				// 4. Create orderItem snapshots
-				...(quote.items ?? []).flatMap((item) => {
-					const oItemId = id();
-					return [
-						tx.orderItems[oItemId].update({
-							orderId:          orderId,
-							companyId:        quote.companyId,
-							productId:        item.productId,
-							parentItemId:     item.parentItemId,
-							isIncludedPart:   item.isIncludedPart,
-							productName:      item.productName,
-							productSku:       item.productSku,
-							brandName:        item.brandName,
-							unit:             item.unit,
-							quantity:         item.quantity,
-							listPrice:        item.listPrice,
-							discountRate:     item.discountRate,
-							unitPrice:        item.unitPrice,
-							vatRate:          item.vatRate,
-							vatAmount:        item.vatAmount,
-							lineTotal:        item.lineTotal,
-							lineTotalWithVat: item.lineTotalWithVat,
-							notes:            item.notes,
-							sortOrder:        item.sortOrder
-						}),
-						tx.orderItems[oItemId].link({ order: orderId })
-					];
-				})
-			];
-
-			// Activity feed kaydı
-			const actFeedId = id();
-			ops.push(
-				tx.activityFeed[actFeedId].update({
-					type:                'order_created',
-					companyId:           quote.companyId,
+				tx.activityFeed[id()].update({
+					type:                'order_approved',
+					companyId:           order.companyId,
 					actorId:             userId,
-					actorName:           myFullName || authStore.userEmail?.split('@')[0] || 'Kullanıcı',
-					description:         '1 sipariş oluşturdu',
+					actorName:           myFullName,
+					description:         '1 teklif onaylandı, siparişe geçti',
 					relatedEntityType:   'order',
-					relatedEntityId:     orderId,
-					relatedEntityNumber: orderNumber,
-					customerId:          quote.customerId,
-					customerCompanyName: customerName,
+					relatedEntityId:     order.id,
+					relatedEntityNumber: order.orderNumber,
+					customerId:          order.customerId,
+					customerCompanyName: order.customer?.name ?? '',
 					createdAt:           now
 				})
-			);
-
-			await db.transact(ops);
-		} catch (err) {
-			console.error('[approveQuote] error:', err);
-			errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
-		} finally {
-			saving = false;
-		}
-	}
-
-	function openReject(quoteId: string) {
-		rejectQuoteId = quoteId;
-		rejectReason  = '';
-		rejectOpen    = true;
-	}
-
-	async function confirmReject() {
-		if (saving) return;
-		saving   = true;
-		errorMsg = '';
-		try {
-			await db.transact([
-				tx.quotes[rejectQuoteId].update({
-					financeStatus: 'rejected'
-				})
 			]);
-			rejectOpen = false;
 		} catch (err) {
-			console.error('[rejectQuote] error:', err);
+			console.error('[approveOrder] error:', err);
 			errorMsg = err instanceof Error ? err.message : JSON.stringify(err);
 		} finally {
 			saving = false;
 		}
 	}
+
+
 </script>
 
 <div class="flex h-full flex-col overflow-hidden">
@@ -290,13 +196,13 @@
 			<div class="flex h-32 items-center justify-center">
 				<div class="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent opacity-30"></div>
 			</div>
-		{:else if quotes.length === 0}
+		{:else if orders.length === 0}
 			<div class="flex h-32 items-center justify-center text-sm text-[#555]">
 				Bekleyen teklif yok
 			</div>
 		{:else}
 			<div class="flex flex-col gap-2">
-				{#each quotes as q (q.id)}
+				{#each orders as q (q.id)}
 					{@const sb = statusBadge(q)}
 					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-4 py-3">
 						<div class="flex items-start justify-between gap-3">
@@ -309,7 +215,7 @@
 									<Badge label={sb.label} variant={sb.variant} />
 								</div>
 								<p class="mt-0.5 text-xs text-[#555]">
-									{q.quoteNumber} · {fmtDate(q.createdAt)} ·
+									{q.orderNumber} · {fmtDate(q.createdAt)} ·
 									{(q.items ?? []).length} kalem
 								</p>
 								<p class="mt-1 text-sm font-semibold text-white">
@@ -325,20 +231,13 @@
 								>
 									Detay
 								</button>
-								{#if authStore.isFinans && (!q.financeStatus || q.financeStatus === 'pending')}
+								{#if authStore.isFinans}
 									<button
-										onclick={() => approveQuote(q)}
+										onclick={() => approveOrder(q)}
 										disabled={saving}
 										class="rounded-lg border border-emerald-700 bg-emerald-900/40 px-3 py-1.5 text-xs font-medium text-emerald-400 transition hover:bg-emerald-800/50 disabled:opacity-40"
 									>
 										Onayla
-									</button>
-									<button
-										onclick={() => openReject(q.id)}
-										disabled={saving}
-										class="rounded-lg border border-red-800 bg-red-950/40 px-3 py-1.5 text-xs font-medium text-red-400 transition hover:bg-red-900/50 disabled:opacity-40"
-									>
-										Reddet
 									</button>
 								{/if}
 							</div>
@@ -351,40 +250,9 @@
 
 </div>
 
-<!-- Reject modal -->
-<Modal open={rejectOpen} title="Teklifi Reddet" width="420px" onclose={() => (rejectOpen = false)}>
-	<div class="p-5">
-		<p class="mb-4 text-sm text-[#aaa]">Reddetme sebebini belirtin (opsiyonel).</p>
-		<TextArea
-			label="Sebep"
-			bind:value={rejectReason}
-			rows={3}
-			placeholder="Neden reddediliyor?"
-		/>
-		{#if errorMsg}
-			<p class="mt-2 text-xs text-red-400">{errorMsg}</p>
-		{/if}
-		<div class="mt-4 flex justify-end gap-2">
-			<button
-				onclick={() => (rejectOpen = false)}
-				class="rounded-lg border border-[#2a2a2a] px-4 py-2 text-sm text-[#aaa] transition hover:bg-[#222]"
-			>
-				İptal
-			</button>
-			<button
-				onclick={confirmReject}
-				disabled={saving}
-				class="rounded-lg border border-red-800 bg-red-900/50 px-4 py-2 text-sm text-red-300 transition hover:bg-red-800/60 disabled:opacity-40"
-			>
-				{saving ? 'Kaydediliyor…' : 'Reddet'}
-			</button>
-		</div>
-	</div>
-</Modal>
-
 <!-- Detail modal -->
-{#if detailOpen && detailQuote}
-	{@const dq = detailQuote}
+{#if detailOpen && detailOrder}
+	{@const dq = detailOrder}
 	{@const sb = statusBadge(dq)}
 	{@const sortedItems = [...(dq.items ?? [])].sort((a, b) => {
 		if (a.isIncludedPart !== b.isIncludedPart) return a.isIncludedPart ? 1 : -1;
@@ -394,7 +262,7 @@
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
 		role="dialog"
 		aria-modal="true"
-		aria-label="Teklif Detayı"
+		aria-label="Sipariş Detayı"
 		tabindex="-1"
 		onclick={() => (detailOpen = false)}
 		onkeydown={(e) => e.key === 'Escape' && (detailOpen = false)}
@@ -406,7 +274,7 @@
 		>
 			<div class="shrink-0 flex items-center justify-between border-b border-[#2a2a2a] px-6 py-4">
 				<div>
-					<p class="text-base font-bold text-white">{dq.quoteNumber}</p>
+					<p class="text-base font-bold text-white">{dq.orderNumber}</p>
 					<p class="text-xs text-[#555] mt-0.5">
 						{fmtDate(dq.createdAt)} · {dq.customer?.name ?? '—'} · {(dq.items ?? []).length} kalem
 					</p>

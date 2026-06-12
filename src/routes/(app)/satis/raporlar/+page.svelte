@@ -2,10 +2,12 @@
 	import { untrack } from 'svelte';
 	import { db } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
+	import { notoSansBase64 } from '$lib/fonts/notoSansBase64';
+	import { notoSansArabicBase64 } from '$lib/fonts/notoSansArabicBase64';
 
 	type Quote = {
 		id: string;
-		quoteNumber?: string;
+		orderNumber?: string;
 		customerId: string;
 		companyId: string;
 		status: string;
@@ -45,7 +47,6 @@
 	let pdfModal         = $state(false);
 	let pdfLang          = $state<Lang>('tr');
 	let pdfExporting     = $state(false);
-	let pdfLoadingFont   = $state(false);
 	let quotes           = $state<Quote[]>([]);
 	let orders           = $state<Order[]>([]);
 	let profiles         = $state<UserProfile[]>([]);
@@ -63,11 +64,11 @@
 		if (!cId) return;
 		loading = true;
 		const u1 = db.subscribeQuery(
-			{ quotes: { $: { where: { companyId: cId } } } },
-			(r) => untrack(() => { quotes = (r.data?.quotes ?? []) as Quote[]; })
+			{ orders: { $: { where: { companyId: cId, status: { in: ['draft', 'pending_finance'] } } } } },
+			(r) => untrack(() => { quotes = (r.data?.orders ?? []) as Quote[]; })
 		);
 		const u2 = db.subscribeQuery(
-			{ orders: { $: { where: { companyId: cId } } } },
+			{ orders: { $: { where: { companyId: cId, status: { in: ['in_production', 'shipped', 'completed', 'cancelled'] } } } } },
 			(r) => untrack(() => { orders = (r.data?.orders ?? []) as Order[]; loading = false; })
 		);
 		const u3 = db.subscribeQuery(
@@ -230,7 +231,7 @@
 			.map(q => ({
 				date:        fmtDate(q.createdAt),
 				assignedTo:  getPersonnelName(q.assignedTo ?? q.createdBy),
-				quoteNumber: q.quoteNumber ?? '—',
+				quoteNumber: q.orderNumber ?? '—',
 				amount:      q.totalWithVat,
 				currency:    q.currency,
 				status:      q.status
@@ -251,8 +252,7 @@
 	}
 	function statusLabel(s: string): string {
 		const MAP: Record<string, string> = {
-			draft: 'Taslak', pending_finance: 'Finans Onayı', approved: 'Onaylı',
-			rejected: 'Reddedildi', cancelled: 'İptal'
+			draft: 'Taslak', pending_finance: 'Finans Onayı', cancelled: 'İptal'
 		};
 		return MAP[s] ?? s;
 	}
@@ -326,35 +326,6 @@
 		}
 	} as const;
 
-	// ── Font loaders ─────────────────────────────────────────────────────────
-	// Fetches font binary and converts to base64 for jsPDF embedding.
-	// Uses loop-based conversion (avoids stack overflow on large files).
-	async function fetchFontBase64(url: string): Promise<string | null> {
-		try {
-			const res = await fetch(url);
-			if (!res.ok) return null;
-			const buf = await res.arrayBuffer();
-			const bytes = new Uint8Array(buf);
-			let binary = '';
-			for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
-			return btoa(binary);
-		} catch {
-			return null;
-		}
-	}
-
-	async function loadFonts(): Promise<{ latinBase64: string | null; arabicBase64: string | null }> {
-		const [latinBase64, arabicBase64] = await Promise.all([
-			// NotoSans — Latin Extended + Cyrillic (TR, EN, RU, FR)
-			// Try @fontsource WOFF first; fall back to Google Fonts TTF
-			fetchFontBase64('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans/files/noto-sans-all-400-normal.woff')
-				.then(r => r ?? fetchFontBase64('https://cdn.jsdelivr.net/gh/google/fonts@main/apache/notosans/NotoSans-Regular.ttf')),
-			// NotoSansArabic — Arabic script (AR)
-			fetchFontBase64('https://cdn.jsdelivr.net/npm/@fontsource/noto-sans-arabic/files/noto-sans-arabic-all-400-normal.woff')
-		]);
-		return { latinBase64, arabicBase64 };
-	}
-
 	// ── Chart capture (SVG → canvas → dataURL) ─────────────────────────────────
 	async function captureElement(el: HTMLElement | null): Promise<string | null> {
 		if (!el) return null;
@@ -388,28 +359,18 @@
 
 	// ── PDF export ─────────────────────────────────────────────────────────────
 	async function exportPdf() {
-		pdfExporting    = true;
-		pdfLoadingFont  = true;
+		pdfExporting = true;
 		try {
-			const [{ jsPDF }, fonts] = await Promise.all([
-				import('jspdf'),
-				loadFonts()
-			]);
-			pdfLoadingFont = false;
+			const { jsPDF } = await import('jspdf');
 
 			// A4 landscape: 297 × 210 mm
 			const doc = new jsPDF({ orientation: 'landscape', format: 'a4' });
-			const { latinBase64, arabicBase64 } = fonts;
 
-			// Register fonts
-			if (latinBase64) {
-				doc.addFileToVFS('NotoSans.ttf', latinBase64);
-				doc.addFont('NotoSans.ttf', 'NotoSans', 'normal');
-			}
-			if (arabicBase64) {
-				doc.addFileToVFS('NotoSansArabic.ttf', arabicBase64);
-				doc.addFont('NotoSansArabic.ttf', 'NotoSansArabic', 'normal');
-			}
+			// Register bundled fonts (no network fetch needed)
+			doc.addFileToVFS('NotoSans.ttf', notoSansBase64);
+			doc.addFont('NotoSans.ttf', 'NotoSans', 'normal');
+			doc.addFileToVFS('NotoSansArabic.ttf', notoSansArabicBase64);
+			doc.addFont('NotoSansArabic.ttf', 'NotoSansArabic', 'normal');
 
 			const L       = LANGS[pdfLang];
 			const PAGE_W  = 297; // landscape A4 width in mm
@@ -417,8 +378,8 @@
 
 			// Re-apply correct font after addPage() calls
 			function setFnt() {
-				if (pdfLang === 'ar' && arabicBase64)   doc.setFont('NotoSansArabic', 'normal');
-				else if (latinBase64)                    doc.setFont('NotoSans', 'normal');
+				if (pdfLang === 'ar') doc.setFont('NotoSansArabic', 'normal');
+				else                  doc.setFont('NotoSans', 'normal');
 			}
 			setFnt();
 
@@ -621,9 +582,8 @@
 
 			doc.save('satis-raporu.pdf');
 		} finally {
-			pdfExporting   = false;
-			pdfLoadingFont = false;
-			pdfModal       = false;
+			pdfExporting = false;
+			pdfModal     = false;
 		}
 	}
 </script>
@@ -767,7 +727,7 @@
 					<div class="flex h-[180px] items-center justify-center text-sm text-gray-600">Bu dönemde veri yok</div>
 				{:else}
 					<svg viewBox="0 0 {CW} {CH}" class="w-full" aria-label="Teklif/Sipariş bar chart">
-						{#each yLabels(barMax) as tick (tick)}
+						{#each yLabels(barMax) as tick, i (i)}
 							{@const y = PT + IH - (tick / barMax) * IH}
 							<line x1={PL} y1={y} x2={CW - PR} y2={y} stroke="#2a2a2a" stroke-width="1" />
 							<text x={PL - 4} y={y + 3} text-anchor="end" font-size="9" fill="#555">{tick}</text>
@@ -870,10 +830,9 @@
 										<td class="px-5 py-3 text-right text-gray-200">{fmt(row.amount)} {row.currency}</td>
 										<td class="px-5 py-3">
 											<span class="inline-flex rounded-full px-2 py-0.5 text-xs font-medium
-												{row.status === 'approved'  ? 'bg-green-900/40 text-green-400'  :
-												 row.status === 'rejected'  ? 'bg-red-900/40 text-red-400'    :
-												 row.status === 'cancelled' ? 'bg-gray-800 text-gray-500'      :
-												                              'bg-blue-900/40 text-blue-400'}">
+												{row.status === 'pending_finance' ? 'bg-amber-900/40 text-amber-400' :
+												 row.status === 'cancelled'       ? 'bg-gray-800 text-gray-500'      :
+												                                    'bg-blue-900/40 text-blue-400'}">
 												{statusLabel(row.status)}
 											</span>
 										</td>
@@ -944,7 +903,7 @@
 					disabled={pdfExporting}
 					class="flex-1 rounded-xl bg-blue-600 py-2.5 text-sm font-medium text-white hover:bg-blue-700 disabled:opacity-60"
 				>
-					{pdfLoadingFont ? 'PDF hazırlanıyor...' : pdfExporting ? 'Oluşturuluyor…' : 'PDF Oluştur'}
+					{pdfExporting ? 'Oluşturuluyor…' : 'PDF Oluştur'}
 				</button>
 			</div>
 		</div>

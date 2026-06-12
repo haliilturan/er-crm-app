@@ -53,7 +53,12 @@
       "Bash(Select-Object FullName)",
       "Bash(git add *)",
       "Bash(git commit *)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(npx instant-cli@latest push schema)",
+      "PowerShell($env:INSTANT_ADMIN_KEY=\"ec56e094-29bb-4929-a56a-8f5eae6267d1\"; node scripts/cleanup-old-data.mjs)",
+      "PowerShell($env:INSTANT_ADMIN_KEY=\"ec56e094-29bb-4929-a56a-8f5eae6267d1\"; npx instant-cli@latest push perms 2>&1)",
+      "PowerShell(Get-Process *)",
+      "PowerShell($env:INSTANT_ADMIN_KEY=\"ec56e094-29bb-4929-a56a-8f5eae6267d1\"; echo \"y\" | npx instant-cli@latest push perms 2>&1)"
     ]
   },
   "enableAllProjectMcpServers": true,

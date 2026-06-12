@@ -48,17 +48,29 @@ const schema = i.schema({
 		}),
 
 		/**
-		 * Teklif / sipariş numarası üretmek için sıra sayacı.
-		 * key = "{companySlug}-{type}-{year}" (örn. "hf-quote-2025") — unique.
+		 * Sipariş numarası üretmek için sıra sayacı.
+		 * key = "{companySlug}-{type}-{year}" (örn. "hf-order-2025") — unique.
 		 */
 		sequences: i.entity({
 			key: i.string().unique(),
 			companyId: i.string().indexed(),
-			// "quote" | "order"
+			// "order"
 			type: i.string().indexed(),
 			year: i.number(),
 			lastValue: i.number(),
 			updatedAt: i.number()
+		}),
+
+		prices: i.entity({
+			// "USD" | "EUR" | "GBP"
+			key: i.string().unique().indexed(),
+			buy: i.number(),
+			sell: i.number(),
+			value: i.number(),
+			change: i.string(),
+			// 1 = artış, -1 = düşüş
+			direction: i.number(),
+			updatedAt: i.number().indexed()
 		}),
 
 		// ─── Müşteriler ───────────────────────────────────────────────────────────
@@ -107,6 +119,13 @@ const schema = i.schema({
 
 		// ─── Ürünler & Markalar ───────────────────────────────────────────────────
 
+		bankAccounts: i.entity({
+			name: i.string().indexed(),
+			iban: i.string().optional(),
+			isActive: i.boolean(),
+			createdAt: i.number()
+		}),
+
 		brands: i.entity({
 			name: i.string().indexed(),
 			slug: i.string().unique(),
@@ -125,6 +144,7 @@ const schema = i.schema({
 			code: i.string().optional(),
 			serialNo: i.string().optional(),
 			firm: i.string().optional(),
+			brandName: i.string().optional(),
 			diameter: i.number().optional(),
 			unitPrice: i.number().optional(),
 			currency: i.string().optional(),
@@ -147,6 +167,11 @@ const schema = i.schema({
 			basePrice: i.number().optional(),
 			vatRate: i.number(),
 			unit: i.string(),
+			descTR: i.string().optional(),
+			descEN: i.string().optional(),
+			descRU: i.string().optional(),
+			descAR: i.string().optional(),
+			descFR: i.string().optional(),
 			createdBy: i.string(),
 			createdAt: i.number(),
 			updatedBy: i.string().optional(),
@@ -162,7 +187,12 @@ const schema = i.schema({
 
 			// ── Taban & Ensör ────────────────────────────────────────────────────────
 			baseMaterial: i.string().optional(),
+			baseWidth: i.number().optional(),
+			baseLength: i.number().optional(),
+			baseHeight: i.number().optional(),
 			encoderDiameter: i.string().optional(),
+			holeDistanceX: i.number().optional(),
+			holeDistanceY: i.number().optional(),
 
 			// ── Kıl Hesaplama ────────────────────────────────────────────────────────
 			bristleMaterial: i.string().optional(),
@@ -222,6 +252,12 @@ const schema = i.schema({
 			// "draft" | "review" | "approved" | "rejected"
 			status: i.string().indexed(),
 			description: i.string().optional(),
+			// ── Multilingual descriptions ───────────────────────────────────────────
+			descTR: i.string().optional(),
+			descEN: i.string().optional(),
+			descRU: i.string().optional(),
+			descAR: i.string().optional(),
+			descFR: i.string().optional(),
 			technicalDescription: i.string().optional(),
 			// string[]
 			photoUrls: i.json().optional(),
@@ -253,20 +289,20 @@ const schema = i.schema({
 			sortOrder: i.number()
 		}),
 
-		// ─── Teklifler ────────────────────────────────────────────────────────────
+		// ─── Siparişler ───────────────────────────────────────────────────────────
 
-		quotes: i.entity({
-			// Örn: "HF-2025-0001"
-			quoteNumber: i.string().unique(),
+		orders: i.entity({
+			orderNumber: i.string().unique(),
 			customerId: i.string().indexed(),
 			companyId: i.string().indexed(),
 			assignedTo: i.string().indexed(),
-			// "draft" | "pending_finance" | "approved" | "rejected" | "cancelled"
+
+			// "draft" | "pending_finance" | "in_production" | "shipped" | "completed" | "cancelled"
 			status: i.string().indexed(),
-			rejectionReason: i.string().optional(),
-			approvedBy: i.string().optional(),
-			approvedAt: i.number().optional(),
-			// "TRY" | "USD" | "EUR" | "GBP"
+
+			financeApprovedAt: i.number().optional(),
+			financeApprovedBy: i.string().optional(),
+
 			currency: i.string(),
 			exchangeRate: i.number().optional(),
 			exchangeRateDate: i.number().optional(),
@@ -274,33 +310,35 @@ const schema = i.schema({
 			totalVat: i.number(),
 			totalWithVat: i.number(),
 			discountTotal: i.number().optional(),
+
+			// "unpaid" | "partial" | "paid"
+			paymentStatus: i.string().optional().indexed(),
+
 			// "warehouse_pickup" | "cargo" | "our_vehicle" | "customer_vehicle"
 			deliveryType: i.string().optional(),
-			// "cash" | "credit_30" | "credit_60" | "credit_90" | "installment"
-			paymentType: i.string().optional(),
+			deliveryFirm: i.string().optional(),
+			// "receiver" | "sender"
+			deliveryPayment: i.string().optional(),
+			// "none" | "semi" | "full"
+			installationType: i.string().optional(),
 			deliveryAddress: i.string().optional(),
 			deliveryCity: i.string().optional(),
 			deliveryCountry: i.string().optional(),
 			estimatedDeliveryDate: i.number().optional(),
+
+			// "cash" | "credit_30" | "credit_60" | "credit_90" | "installment"
+			paymentType: i.string().optional(),
+			bankAccount: i.string().optional(),
+			productionDuration: i.string().optional(),
+
 			validUntil: i.number().optional(),
-			// "tr" | "en"
+			// "tr" | "en" | "ru" | "ar" | "fr"
 			language: i.string(),
+			purchaseOrderNumber: i.string().optional(),
 			notes: i.string().optional(),
 			internalNotes: i.string().optional(),
-			// Nakliye detayları
-			deliveryFirm:       i.string().optional(),
-			// "receiver" | "sender"
-			deliveryPayment:    i.string().optional(),
-			// "none" | "semi" | "full"
-			installationType:   i.string().optional(),
-			// Banka hesap bilgisi (serbest metin)
-			bankAccount:        i.string().optional(),
-			// Üretim süresi (serbest metin, örn: "4-6 hafta")
-			productionDuration: i.string().optional(),
-			// Finans onayı — "pending" | "approved" | "rejected"
-			financeStatus:       i.string().optional().indexed(),
-			financeApprovedAt:   i.number().optional(),
-			financeApprovedBy:   i.string().optional(),
+			customerName: i.string().optional(),
+
 			createdBy: i.string(),
 			createdAt: i.number().indexed(),
 			updatedBy: i.string().optional(),
@@ -308,11 +346,11 @@ const schema = i.schema({
 		}),
 
 		/**
-		 * Teklif satırları — ürün verileri snapshot olarak taşınır.
+		 * Sipariş satırları — ürün verileri snapshot olarak taşınır.
 		 * isIncludedPart = true olanlar eşantiyon/hediye satırlarıdır (fiyat: 0).
 		 */
-		quoteItems: i.entity({
-			quoteId: i.string().indexed(),
+		orderItems: i.entity({
+			orderId: i.string().indexed(),
 			companyId: i.string().indexed(),
 			// Custom item'larda null olabilir
 			productId: i.string().optional(),
@@ -332,81 +370,24 @@ const schema = i.schema({
 			lineTotal: i.number(),
 			lineTotalWithVat: i.number(),
 			notes: i.string().optional(),
+			descTR: i.string().optional(),
+			descEN: i.string().optional(),
+			descRU: i.string().optional(),
+			descAR: i.string().optional(),
+			descFR: i.string().optional(),
 			sortOrder: i.number()
 		}),
 
 		/**
-		 * Teklif durum geçiş logu — tüm status değişiklikleri burada saklanır.
+		 * Sipariş durum geçiş logu — tüm status değişiklikleri burada saklanır.
 		 */
-		quoteStatusHistory: i.entity({
-			quoteId: i.string().indexed(),
+		orderStatusHistory: i.entity({
+			orderId: i.string().indexed(),
 			fromStatus: i.string(),
 			toStatus: i.string(),
 			changedBy: i.string(),
-			// Reddetme durumunda zorunlu, diğerlerinde opsiyonel
 			reason: i.string().optional(),
 			changedAt: i.number().indexed()
-		}),
-
-		// ─── Siparişler ───────────────────────────────────────────────────────────
-
-		/**
-		 * Teklif onaylandığında otomatik oluşturulur.
-		 * Teklif verileri kopyalanır — orderItems ayrı snapshot olarak tutulur.
-		 */
-		orders: i.entity({
-			// Örn: "SIP-2025-0001"
-			orderNumber: i.string().unique(),
-			quoteId: i.string().indexed(),
-			customerId: i.string().indexed(),
-			companyId: i.string().indexed(),
-			customerName: i.string().optional(),
-			// "active" | "completed" | "cancelled"
-			status: i.string().indexed(),
-			// "unpaid" | "partial" | "paid"
-			paymentStatus: i.string().optional().indexed(),
-			currency: i.string(),
-			subtotal: i.number(),
-			totalVat: i.number(),
-			totalWithVat: i.number(),
-			deliveryType: i.string().optional(),
-			paymentType: i.string().optional(),
-			deliveryAddress: i.string().optional(),
-			deliveryCity: i.string().optional(),
-			deliveryCountry: i.string().optional(),
-			notes: i.string().optional(),
-			approvedBy: i.string().optional(),
-			approvedAt: i.number().optional(),
-			createdBy: i.string(),
-			createdAt: i.number().indexed(),
-			updatedBy: i.string().optional(),
-			updatedAt: i.number().optional()
-		}),
-
-		/**
-		 * quoteItems'ın sipariş anındaki dondurulmuş kopyası.
-		 * Teklif sonradan değişse de sipariş verileri korunur.
-		 */
-		orderItems: i.entity({
-			orderId: i.string().indexed(),
-			companyId: i.string().indexed(),
-			productId: i.string().optional(),
-			parentItemId: i.string().optional(),
-			isIncludedPart: i.boolean(),
-			productName: i.string(),
-			productSku: i.string().optional(),
-			brandName: i.string().optional(),
-			unit: i.string(),
-			quantity: i.number(),
-			listPrice: i.number(),
-			discountRate: i.number(),
-			unitPrice: i.number(),
-			vatRate: i.number(),
-			vatAmount: i.number(),
-			lineTotal: i.number(),
-			lineTotalWithVat: i.number(),
-			notes: i.string().optional(),
-			sortOrder: i.number()
 		}),
 
 		// ─── Cross-Module ─────────────────────────────────────────────────────────
@@ -416,8 +397,8 @@ const schema = i.schema({
 		 * Tüm görüntüleme verileri snapshot olarak taşınır — join olmadan render edilir.
 		 */
 		activityFeed: i.entity({
-			// "quote_created" | "quote_updated" | "quote_submitted" |
-			// "quote_approved" | "quote_rejected" | "order_created" | "customer_added"
+			// "order_created" | "order_updated" | "order_submitted" |
+			// "order_approved" | "customer_added"
 			type: i.string().indexed(),
 			companyId: i.string().indexed(),
 			actorId: i.string().indexed(),
@@ -428,12 +409,12 @@ const schema = i.schema({
 			customerId: i.string().optional(),
 			customerContactName: i.string().optional(),
 			customerCompanyName: i.string().optional(),
-			// "quote" | "order" | "customer"
+			// "order" | "customer"
 			relatedEntityType: i.string(),
 			relatedEntityId: i.string(),
 			// Örn: "HF-2025-0001"
 			relatedEntityNumber: i.string().optional(),
-			// İnsan okunabilir eylem açıklaması — "1 teklif girdi", "1 sipariş oluşturdu"
+			// İnsan okunabilir eylem açıklaması — "1 sipariş girdi", "1 sipariş oluşturdu"
 			description: i.string().optional(),
 			amount: i.number().optional(),
 			currency: i.string().optional(),
@@ -449,14 +430,14 @@ const schema = i.schema({
 		 * Status geçişlerinde otomatik, aynı transaction içinde yazılır.
 		 */
 		tasks: i.entity({
-			// "quote_submitted" | "quote_approved" | "quote_rejected" | "order_created" | "quote_tracking" | "manual"
+			// "order_submitted" | "order_approved" | "order_created" | "order_tracking" | "manual"
 			type: i.string().indexed(),
 			title: i.string(),
 			description: i.string().optional(),
-			// "quote" | "order" | "customer"
+			// "order" | "customer"
 			relatedEntityType: i.string().optional(),
 			relatedEntityId: i.string().optional(),
-			quoteId: i.string().optional(),
+			orderId: i.string().optional(),
 			assignedTo: i.string().indexed(),
 			companyId: i.string().indexed(),
 			// "pending" | "done" | "dismissed"
@@ -574,40 +555,11 @@ const schema = i.schema({
 			reverse: { on: 'productDrafts', has: 'many', label: 'parts' }
 		},
 
-		// ─── Teklifler ───────────────────────────────────────────────────────────
-
-		quoteCustomer: {
-			forward: { on: 'quotes', has: 'one', label: 'customer' },
-			reverse: { on: 'customers', has: 'many', label: 'quotes' }
-		},
-		quoteAssignee: {
-			forward: { on: 'quotes', has: 'one', label: 'assignee' },
-			reverse: { on: 'userProfiles', has: 'many', label: 'assignedQuotes' }
-		},
-		quoteItemQuote: {
-			forward: { on: 'quoteItems', has: 'one', label: 'quote' },
-			reverse: { on: 'quotes', has: 'many', label: 'items' }
-		},
-		quoteItemProduct: {
-			forward: { on: 'quoteItems', has: 'one', label: 'product' },
-			reverse: { on: 'products', has: 'many', label: 'quoteItems' }
-		},
-		// Self-referential: eşantiyon satırlarının üst satıra bağlantısı
-		quoteItemParent: {
-			forward: { on: 'quoteItems', has: 'one', label: 'parent' },
-			reverse: { on: 'quoteItems', has: 'many', label: 'children' }
-		},
-		quoteStatusQuote: {
-			forward: { on: 'quoteStatusHistory', has: 'one', label: 'quote' },
-			reverse: { on: 'quotes', has: 'many', label: 'statusHistory' }
-		},
-
 		// ─── Siparişler ──────────────────────────────────────────────────────────
 
-		// Bir tekliften en fazla bir sipariş oluşur
-		orderQuote: {
-			forward: { on: 'orders', has: 'one', label: 'sourceQuote' },
-			reverse: { on: 'quotes', has: 'one', label: 'order' }
+		orderAssignee: {
+			forward: { on: 'orders', has: 'one', label: 'assignee' },
+			reverse: { on: 'userProfiles', has: 'many', label: 'assignedOrders' }
 		},
 		orderCustomer: {
 			forward: { on: 'orders', has: 'one', label: 'customer' },
@@ -621,6 +573,14 @@ const schema = i.schema({
 		orderItemParent: {
 			forward: { on: 'orderItems', has: 'one', label: 'parent' },
 			reverse: { on: 'orderItems', has: 'many', label: 'children' }
+		},
+		orderItemProduct: {
+			forward: { on: 'orderItems', has: 'one', label: 'product' },
+			reverse: { on: 'products', has: 'many', label: 'orderItems' }
+		},
+		orderStatusOrder: {
+			forward: { on: 'orderStatusHistory', has: 'one', label: 'order' },
+			reverse: { on: 'orders', has: 'many', label: 'statusHistory' }
 		},
 
 		// ─── Activity Feed ───────────────────────────────────────────────────────

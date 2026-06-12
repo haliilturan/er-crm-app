@@ -75,18 +75,18 @@
 		);
 	});
 
-	// ─── Quotes map (for quote tracking tasks) ───────────────────────────────
-	let quotesMap = $state<Record<string, any>>({});
+	// ─── Orders map (for order tracking tasks) ───────────────────────────────
+	let ordersMap = $state<Record<string, any>>({});
 
 	$effect(() => {
 		const cid = authStore.activeCompanyId;
 		if (!cid) return;
 		return db.subscribeQuery(
-			{ quotes: { $: { where: { companyId: cid } }, customer: {} } },
+			{ orders: { $: { where: { companyId: cid, status: { in: ['draft', 'pending_finance'] } } }, customer: {} } },
 			(res) => {
 				untrack(() => {
-					const list = (res.data?.quotes ?? []) as any[];
-					quotesMap = Object.fromEntries(list.map((q) => [q.id, q]));
+					const list = (res.data?.orders ?? []) as any[];
+					ordersMap = Object.fromEntries(list.map((q) => [q.id, q]));
 				});
 			}
 		);
@@ -111,7 +111,7 @@
 	});
 
 	// ─── Task form state ─────────────────────────────────────────────────────
-	let newTask   = $state({ title: '', description: '', customerId: '' });
+	let newTask   = $state({ title: '', description: '', customerId: '', assignedTo: '' });
 	let saving    = $state(false);
 	let formError = $state('');
 	let toasts    = $state<Array<{ id: string; description: string; dismissible: boolean }>>([]);
@@ -129,7 +129,7 @@
 					title:      newTask.title.trim(),
 					type:       'manual',
 					status:     'pending',
-					assignedTo: uid,
+					assignedTo: newTask.assignedTo || uid,
 					companyId:  cid,
 					createdBy:  uid,
 					createdAt:  Date.now(),
@@ -142,7 +142,7 @@
 				})
 			]);
 			toasts = [...toasts, { id: String(Date.now()), description: 'Görev oluşturuldu ✓', dismissible: true }];
-			newTask = { title: '', description: '', customerId: '' };
+			newTask = { title: '', description: '', customerId: '', assignedTo: '' };
 			taskSubTab = 'received';
 		} catch (err) {
 			console.error('saveTask error:', err);
@@ -189,11 +189,10 @@
 	}
 
 	const ACTIVITY_LABELS: Record<string, string> = {
-		quote_created:   'Yeni teklif oluşturuldu',
-		quote_submitted: 'Teklif onaya gönderildi',
-		quote_approved:  'Teklif onaylandı',
-		quote_rejected:  'Teklif reddedildi',
-		order_created:   'Sipariş oluşturuldu',
+		order_created:   'Yeni sipariş oluşturuldu',
+		order_submitted: 'Sipariş onaya gönderildi',
+		order_approved:  'Sipariş onaylandı',
+		order_rejected:  'Sipariş reddedildi',
 		customer_added:  'Yeni müşteri eklendi'
 	};
 
@@ -289,6 +288,16 @@
 			.map((w: string) => w[0] ?? '')
 			.join('')
 			.toUpperCase();
+	}
+
+	async function teklifLinkiKopyala(orderId: string) {
+		const order = ordersMap[orderId];
+		const customerId = (order?.customer as any)?.id;
+		const link = customerId
+			? `${window.location.origin}/satis/musteriler/${customerId}/teklifler`
+			: `${window.location.origin}/satis/musteriler`;
+		await navigator.clipboard.writeText(link);
+		toasts = [...toasts, { id: String(Date.now()), description: 'Teklif linki kopyalandı ✓', dismissible: true }];
 	}
 
 	function fmtMsgTime(ts: number): string {
@@ -413,7 +422,7 @@
 	const activePendingCount = $derived(tasks.filter((t) => t.status === 'pending').length);
 
 	const quoteTrackingTasks = $derived(
-		tasks.filter((t) => t.quoteId && t.status !== 'done' && t.status !== 'dismissed')
+		tasks.filter((t) => t.orderId && t.status !== 'done' && t.status !== 'dismissed')
 	);
 
 	const pendingQuoteCount = $derived(quoteTrackingTasks.length);
@@ -422,19 +431,19 @@
 		[...quoteTrackingTasks].sort((a, b) => daysSince(b.createdAt) - daysSince(a.createdAt))
 	);
 
-	// ─── Auto-close quote tasks when quote is approved ────────────────────────
+	// ─── Auto-close order tasks when order moves to production ───────────────
 	const autoClosedIds = new SvelteSet<string>();
 
 	$effect(() => {
-		const qMap   = quotesMap;
+		const qMap   = ordersMap;
 		const tList  = tasks;
 
 		const toClose = tList.filter((t) => {
-			if (!t.quoteId || t.status === 'done' || t.status === 'dismissed') return false;
+			if (!t.orderId || t.status === 'done' || t.status === 'dismissed') return false;
 			if (untrack(() => autoClosedIds.has(t.id))) return false;
-			const q = qMap[t.quoteId];
+			const q = qMap[t.orderId];
 			if (!q) return false;
-			return q.status === 'approved' || q.financeStatus === 'approved';
+			return q.status === 'in_production';
 		});
 
 		if (!toClose.length) return;
@@ -442,6 +451,8 @@
 		const now = Date.now();
 		db.transact(toClose.map((t) => tx.tasks[t.id].update({ status: 'done', completedAt: now })));
 	});
+
+	const teklifler = $derived(Object.values(ordersMap) as any[]);
 
 	// Counts tasks that have a dueAt on each day of the week strip
 	const taskCountByDay = $derived(
@@ -466,7 +477,7 @@
 				class="relative px-3 py-1 rounded-full text-xs font-medium transition-colors
 					{activeTab === 'tasks' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
 			>
-				Tasks
+				Görevler
 			</button>
 			<button
 				type="button"
@@ -474,7 +485,7 @@
 				class="relative px-3 py-1 rounded-full text-xs font-medium transition-colors
 					{activeTab === 'chats' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
 			>
-				Chats
+				Mesajlar
 				{#if unreadCount > 0}
 					<span class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-red-500 flex items-center justify-center text-[8px] font-bold text-white px-0.5">{unreadCount > 9 ? '9+' : unreadCount}</span>
 				{/if}
@@ -509,9 +520,9 @@
 
 			<!-- Header -->
 			<div class="mb-4">
-				<h3 class="text-base font-bold text-white">Task Management</h3>
+				<h3 class="text-base font-bold text-white">Görev Yönetimi</h3>
 				<div class="flex items-center gap-2 mt-0.5">
-					<p class="text-xs text-[#555]">{activePendingCount} Active tasks</p>
+					<p class="text-xs text-[#555]">{activePendingCount} Aktif görev</p>
 					{#if pendingQuoteCount > 0}
 						<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-orange-950/70 text-orange-300 border border-orange-800/40">
 							{pendingQuoteCount} Teklif Takibi
@@ -574,17 +585,14 @@
 
 			<!-- ── Sub tabs ──────────────────────────────────────────────── -->
 			<div class="flex gap-0.5 mb-3 bg-[#1a1a1a] rounded-full p-0.5">
-				{#each (['received', 'quote_tracking', 'sent', 'new'] as const) as sub (sub)}
+				{#each (['received', 'sent', 'new'] as const) as sub (sub)}
 					<button
 						type="button"
 						onclick={() => { taskSubTab = sub; if (sub !== 'new') formError = ''; }}
 						class="relative flex-1 py-1 rounded-full text-xs font-medium transition-colors
 							{taskSubTab === sub ? 'bg-white text-black' : 'text-[#555] hover:text-white'}"
 					>
-						{sub === 'received' ? 'Received' : sub === 'quote_tracking' ? 'Teklifler' : sub === 'sent' ? 'Sent' : 'New'}
-						{#if sub === 'quote_tracking' && pendingQuoteCount > 0 && taskSubTab !== 'quote_tracking'}
-							<span class="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-orange-500"></span>
-						{/if}
+						{sub === 'received' ? 'Alınan' : sub === 'sent' ? 'Gönderilenler' : 'Yeni'}
 					</button>
 				{/each}
 			</div>
@@ -600,6 +608,12 @@
 						bind:value={newTask.customerId}
 						options={formCustomers.map((c) => ({ value: c.id, label: c.name }))}
 						placeholder="Müşteri seçin (opsiyonel)"
+					/>
+					<Select
+						label="Atanacak Personel"
+						bind:value={newTask.assignedTo}
+						options={allProfiles.map((p) => ({ value: p.userId, label: p.fullName ?? p.email ?? p.userId }))}
+						placeholder="Bana ata (varsayılan)"
 					/>
 					{#if formError}<p class="text-xs text-red-400">{formError}</p>{/if}
 					<div class="flex gap-2 pt-1">
@@ -629,7 +643,7 @@
 						</div>
 					{:else}
 						{#each sortedQuoteTrackingTasks as task (task.id)}
-							{@const q       = quotesMap[task.quoteId]}
+							{@const q       = ordersMap[task.orderId]}
 							{@const days    = daysSince(task.createdAt)}
 							{@const overdue = days >= 7}
 							<div class="rounded-2xl border px-3 py-3 bg-[#1a1a1a] transition-colors
@@ -639,7 +653,7 @@
 										<p class="text-sm font-semibold text-white leading-tight truncate">
 											{q?.customer?.name ?? task.title ?? '—'}
 										</p>
-										<p class="text-[10px] text-[#555] mt-0.5">{q?.quoteNumber ?? ''}</p>
+										<p class="text-[10px] text-[#555] mt-0.5">{q?.orderNumber ?? ''}</p>
 									</div>
 									<div class="flex flex-col items-end gap-1 shrink-0">
 										{#if overdue}
@@ -731,12 +745,12 @@
 											</p>
 										{/if}
 
-										<!-- Quote tracking badge + info -->
-										{#if task.quoteId}
+										<!-- Order tracking badge + info -->
+										{#if task.orderId}
 											<span class="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-orange-950/70 text-orange-300 border border-orange-800/40">
 												Teklif Takibi
 											</span>
-											{@const q = quotesMap[task.quoteId]}
+											{@const q = ordersMap[task.orderId]}
 											{#if q}
 												<p class="text-[10px] text-[#555] mt-0.5 leading-tight">
 													{q.customer?.name ?? ''}
@@ -749,7 +763,7 @@
 										{#if isExpanded}
 											{#if task.relatedEntityType === 'customer' && customersById[task.relatedEntityId]}
 												<p class="text-xs text-[#444] mt-2">
-													Related client: <span class="text-[#666]">{customersById[task.relatedEntityId]}</span>
+													İlgili müşteri: <span class="text-[#666]">{customersById[task.relatedEntityId]}</span>
 												</p>
 											{/if}
 
@@ -764,7 +778,7 @@
 														type="button"
 														onclick={() => (expandedId = null)}
 														class="px-2.5 py-1 rounded-full border border-[#2a2a2a] text-[10px] text-[#666] hover:text-white hover:border-[#444] transition-colors"
-													>Close</button>
+													>Kapat</button>
 
 													<!-- Message icon -->
 													<button
@@ -776,13 +790,17 @@
 													</button>
 
 													<!-- Share icon -->
-													<button
-														type="button"
-														aria-label="Paylaş"
-														class="w-6 h-6 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-[#555] hover:text-white transition-colors"
-													>
-														<Share2 size={11} />
-													</button>
+													{#if task.orderId}
+														<button
+															type="button"
+															aria-label="Teklif linkini kopyala"
+															title="Teklif linkini kopyala"
+															onclick={() => teklifLinkiKopyala(task.orderId)}
+															class="w-6 h-6 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-[#555] hover:text-white transition-colors"
+														>
+															<Share2 size={11} />
+														</button>
+													{/if}
 
 													<!-- Complete -->
 													<button
@@ -791,7 +809,7 @@
 														disabled={completing === task.id}
 														class="ml-auto px-3 py-1 rounded-full bg-white text-black text-[10px] font-semibold hover:bg-[#e8e8e8] transition-colors disabled:opacity-50"
 													>
-														{completing === task.id ? '…' : 'Complete'}
+														{completing === task.id ? '…' : 'Tamamla'}
 													</button>
 												</div>
 											{/if}
@@ -802,6 +820,31 @@
 						{/each}
 					{/if}
 				</div>
+
+				<!-- ── Teklif takip görevleri (yalnızca Alınan sekmesinde) ────── -->
+				{#if taskSubTab === 'received'}
+					{@const now = Date.now()}
+					{@const takipGorevleri = tasks.filter(t => t.orderId && t.status === 'pending' && (t.dueAt ?? Infinity) <= now)}
+					{#if takipGorevleri.length > 0}
+						<div class="mt-4">
+							{#each takipGorevleri as gorev (gorev.id)}
+								{@const q = ordersMap[gorev.orderId]}
+								<div class="flex items-center justify-between rounded-lg border border-orange-900/40 bg-[#1a1a1a] px-4 py-3 mb-2">
+									<div class="min-w-0 flex-1">
+										<p class="text-sm font-medium text-white truncate">{gorev.title}</p>
+										<p class="text-xs text-[#666]">{q?.customer?.name ?? ''}</p>
+									</div>
+									<div class="shrink-0 ml-3 flex flex-col items-end gap-1">
+										<span class="text-[9px] font-bold text-orange-400 uppercase">Vadesi Geçti</span>
+										{#if q?.totalWithVat}
+											<span class="text-xs text-[#888]">{fmtMoney(q.totalWithVat, q.currency)}</span>
+										{/if}
+									</div>
+								</div>
+							{/each}
+						</div>
+					{/if}
+				{/if}
 			{/if}
 
 		<!-- ── CHATS ─────────────────────────────────────────────────────── -->

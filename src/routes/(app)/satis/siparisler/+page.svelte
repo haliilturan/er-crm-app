@@ -27,7 +27,17 @@
 		if (!cId) return;
 		loading = true;
 		return db.subscribeQuery(
-			{ orders: { $: { where: { companyId: cId }, order: { createdAt: 'desc' } } } },
+			{
+				orders: {
+					$: {
+						where: {
+							companyId: cId,
+							status: { in: ['in_production', 'shipped', 'completed', 'cancelled'] }
+						},
+						order: { createdAt: 'desc' }
+					}
+				}
+			},
 			(result) => {
 				untrack(() => {
 					orders  = (result.data?.orders ?? []) as Order[];
@@ -46,9 +56,11 @@
 	}
 
 	function statusBadge(status: string): { label: string; variant: BadgeVariant } {
-		if (status === 'completed') return { label: 'Tamamlandı', variant: 'success' };
-		if (status === 'cancelled') return { label: 'İptal',      variant: 'danger'  };
-		return                             { label: 'Aktif',      variant: 'info'    };
+		if (status === 'completed')     return { label: 'Tamamlandı', variant: 'success' };
+		if (status === 'cancelled')     return { label: 'İptal',      variant: 'danger'  };
+		if (status === 'shipped')       return { label: 'Kargoda',    variant: 'info'    };
+		if (status === 'in_production') return { label: 'Üretimde',   variant: 'warning' };
+		return                                 { label: 'Aktif',      variant: 'info'    };
 	}
 
 	function fmtDate(ts: number): string {

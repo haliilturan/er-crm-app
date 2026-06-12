@@ -29,16 +29,27 @@
 
 	let filled = $derived(value !== null && value !== undefined);
 
+	// Virgül → nokta dönüşümü: Türkçe klavyede "," yazılınca NaN olmaz
+	let rawText = $state(value != null ? String(value) : '');
+
+	function handleInput(e: Event) {
+		const raw = (e.target as HTMLInputElement).value;
+		rawText = raw;
+		const parsed = parseFloat(raw.replace(/\./g, '').replace(',', '.'));
+		if (!isNaN(parsed)) value = parsed;
+		oninput?.(e);
+	}
+
 	function increment() {
 		if (disabled) return;
 		const next = (value ?? 0) + step;
-		if (max === undefined || next <= max) value = next;
+		if (max === undefined || next <= max) { value = next; rawText = String(next); }
 	}
 
 	function decrement() {
 		if (disabled) return;
 		const next = (value ?? 0) - step;
-		if (min === undefined || next >= min) value = next;
+		if (min === undefined || next >= min) { value = next; rawText = String(next); }
 	}
 </script>
 
@@ -56,23 +67,18 @@
 		</label>
 		<input
 			{id}
-			type="number"
+			type="text"
+			inputmode="decimal"
 			{name}
 			{placeholder}
 			{disabled}
 			{required}
-			{min}
-			{max}
-			{step}
-			{oninput}
+			value={rawText}
+			oninput={handleInput}
 			{onchange}
-			bind:value
 			class="bg-transparent border-none outline-none text-sm text-white
 				placeholder-[#555] w-full leading-none
-				disabled:opacity-50 disabled:cursor-not-allowed
-				[appearance:textfield]
-				[&::-webkit-outer-spin-button]:appearance-none
-				[&::-webkit-inner-spin-button]:appearance-none"
+				disabled:opacity-50 disabled:cursor-not-allowed"
 		/>
 	</div>
 	<div class="flex flex-col items-center gap-2 ml-3 shrink-0">
