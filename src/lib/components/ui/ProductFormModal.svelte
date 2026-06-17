@@ -558,6 +558,7 @@
 	}
 
 	async function saveAndAdd() {
+		if (saving) return;
 		if (!isDirty || !quoteSourceProduct) return;
 		if (!name.trim()) { errorMsg = 'Ürün adı zorunludur.'; return; }
 		if (!sku.trim())  { errorMsg = 'SKU zorunludur.'; return; }
@@ -641,6 +642,7 @@
 	}
 
 	async function save() {
+		if (saving) return;
 		if (!name.trim()) { errorMsg = 'Ürün adı zorunludur.'; return; }
 		if (!sku.trim() && !draftMode) { errorMsg = 'SKU zorunludur.'; return; }
 		const pid = productId.trim();
@@ -1200,6 +1202,7 @@
 			<button
 				type="button"
 				disabled={!isDirty || saving}
+				style={saving ? 'pointer-events: none' : ''}
 				onclick={saveAndAdd}
 				class="flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-colors
 					{isDirty && !saving ? 'border border-amber-800 text-amber-400 hover:bg-amber-950/30' : 'border border-[#2a2a2a] text-gray-600 cursor-not-allowed opacity-50'}"
@@ -1229,6 +1232,7 @@
 				type="button"
 				onclick={save}
 				disabled={saving}
+				style={saving ? 'pointer-events: none' : ''}
 				class="flex items-center gap-1.5 px-5 py-2 rounded-xl bg-white text-black text-sm font-medium hover:bg-[#e8e8e8] transition-colors disabled:opacity-50"
 			>
 				{#if saving}

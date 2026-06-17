@@ -69,6 +69,8 @@
 	let pendingCategory = $state('');
 	let pendingIsCustom = $state(false);
 
+	let deleteSaving   = $state(false);
+
 	// Picker
 	let pickerModal    = $state(false);
 	let pickerSearch   = $state('');
@@ -181,11 +183,15 @@
 	}
 
 	async function deleteProduct(productId: string) {
+		if (deleteSaving) return;
 		if (!confirm('Bu ürünü silmek istediğinizden emin misiniz?')) return;
+		deleteSaving = true;
 		try {
 			await db.transact([(tx.products as any)[productId].delete()]);
 		} catch (err) {
 			console.error('[taslaklar] deleteProduct error:', err);
+		} finally {
+			deleteSaving = false;
 		}
 	}
 </script>
@@ -357,8 +363,10 @@
 									<button
 										type="button"
 										onclick={() => deleteProduct(product.id)}
+										disabled={deleteSaving}
+										style={deleteSaving ? 'pointer-events: none' : ''}
 										title="Sil"
-										class="p-1.5 rounded-lg hover:bg-red-950/30 text-gray-400 hover:text-red-400 transition-colors"
+										class="p-1.5 rounded-lg hover:bg-red-950/30 text-gray-400 hover:text-red-400 transition-colors disabled:opacity-40"
 									>
 										<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 											<path d="M3 6h18M19 6l-1 14H6L5 6M10 6V4h4v2"/>

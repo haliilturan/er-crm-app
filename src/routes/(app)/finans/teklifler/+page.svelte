@@ -231,10 +231,11 @@
 								>
 									Detay
 								</button>
-								{#if authStore.isFinans}
+								{#if authStore.isFinansOrAdmin}
 									<button
 										onclick={() => approveOrder(q)}
 										disabled={saving}
+										style={saving ? 'pointer-events: none' : ''}
 										class="rounded-lg border border-emerald-700 bg-emerald-900/40 px-3 py-1.5 text-xs font-medium text-emerald-400 transition hover:bg-emerald-800/50 disabled:opacity-40"
 									>
 										Onayla

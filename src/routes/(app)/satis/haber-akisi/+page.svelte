@@ -75,7 +75,6 @@
 	let selectedUserId = $state<string | null>(null);
 	let userSearch     = $state('');
 	let activeTab      = $state<'offers' | 'orders' | 'tasks'>('tasks');
-	let expandedId     = $state<string | null>(null);
 	let modalOpen      = $state(false);
 	let modalOrder     = $state<OrderItem | null>(null);
 
@@ -170,20 +169,21 @@
 		if (activeTab === 'offers') {
 			orders
 				.filter(o => ['draft', 'pending_finance'].includes(o.status))
-				.filter(o => matchesDate(o.createdAt) && matchesUser(o.createdBy))
+				.filter(o => matchesDate(o.createdAt) && matchesUser(o.assignedTo))
 				.forEach(o => items.push({ ...o, _kind: 'order' as const }));
 		} else if (activeTab === 'orders') {
 			orders
 				.filter(o => ['in_production', 'shipped', 'completed', 'cancelled'].includes(o.status))
-				.filter(o => matchesDate(o.createdAt) && matchesUser(o.createdBy))
+				.filter(o => matchesDate(o.createdAt) && matchesUser(o.assignedTo))
 				.forEach(o => items.push({ ...o, _kind: 'order' as const }));
 		} else {
 			tasks
-				.filter(t => matchesDate(t.createdAt) && matchesUser(t.createdBy))
+				.filter(t => matchesDate(t.createdAt) && matchesUser(t.assignedTo))
 				.forEach(t => items.push({ ...t, _kind: 'task' as const }));
 		}
 
-		return items.sort((a, b) => b.createdAt - a.createdAt);
+		const sorted = items.sort((a, b) => b.createdAt - a.createdAt);
+		return [...new Map(sorted.map(i => [i.id, i])).values()];
 	})());
 
 	// ── Subscription ──────────────────────────────────────────────────────────
@@ -210,17 +210,20 @@
 			},
 			(result) => {
 				untrack(() => {
-					tasks  = (result.data?.tasks  ?? []) as TaskItem[];
-					orders = (result.data?.orders ?? []) as OrderItem[];
+					const rawTasks  = (result.data?.tasks  ?? []) as TaskItem[];
+					const rawOrders = (result.data?.orders ?? []) as OrderItem[];
+					tasks  = [...new Map(rawTasks.map(t => [t.id, t])).values()];
+					orders = [...new Map(rawOrders.map(o => [o.id, o])).values()];
 
 					const uc = (result.data?.userCompanies ?? []) as {
 						userId:   string;
 						role:     string;
 						profile?: Profile;
 					}[];
-					userList = uc
+					const rawUsers = uc
 						.filter(u => !!u.profile)
 						.map(u => ({ userId: u.userId, role: u.role, profile: u.profile! }));
+					userList = [...new Map(rawUsers.map(u => [u.userId, u])).values()];
 
 					loading = false;
 				});
@@ -250,10 +253,6 @@
 	function fmt(n: number, currency = 'TRY'): string {
 		const sym: Record<string, string> = { TRY: '₺', USD: '$', EUR: '€', GBP: '£' };
 		return `${sym[currency] ?? ''}${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-	}
-
-	function toggleExpand(itemId: string) {
-		expandedId = expandedId === itemId ? null : itemId;
 	}
 
 	function openChat(userId: string) {
@@ -311,8 +310,8 @@
 					description={u.role === 'admin' ? 'Yönetici' : u.role === 'viewer' ? 'İzleyici' : 'Üye'}
 					avatarText={initials(u.profile?.fullName ?? '?')}
 					variant="avatar"
-					active={selectedUserId === u.userId}
-					onclick={() => (selectedUserId = u.userId)}
+					active={selectedUserId === u.profile.id}
+					onclick={() => (selectedUserId = u.profile.id)}
 				/>
 			{/each}
 		</div>
@@ -346,7 +345,7 @@
 			<Tabs
 				tabs={TABS}
 				value={activeTab}
-				onchange={(tab) => { activeTab = tab.value as typeof activeTab; expandedId = null; }}
+				onchange={(tab) => { activeTab = tab.value as typeof activeTab; }}
 			/>
 		</div>
 
@@ -360,17 +359,12 @@
 				<div class="empty-state">Bu tarihte kayıt yok</div>
 			{:else}
 				{#each feedItems as item (item.id)}
-					{@const expanded = expandedId === item.id}
 					{@const profile  = profileByUserId[item.createdBy]}
 					{@const name     = profile?.fullName ?? 'Personel'}
 
-					<div class="news-card" class:expanded>
+					<div class="news-card">
 
-						<button
-							class="card-main"
-							type="button"
-							onclick={() => toggleExpand(item.id)}
-						>
+						<div class="card-main">
 							<span class="avatar">{initials(name)}</span>
 
 							<span class="card-body">
@@ -405,44 +399,7 @@
 									<span class="card-desc">{(item as TaskItem).description}</span>
 								{/if}
 							</span>
-						</button>
-
-						{#if expanded}
-							<div class="card-actions">
-								{#if item._kind === 'task'}
-									{@const t = item as TaskItem & { _kind: 'task' }}
-									{#if t.status === 'pending'}
-										<button class="action-btn primary" type="button">Tamamla</button>
-									{/if}
-									<button
-										class="action-icon"
-										type="button"
-										title="Mesaj gönder"
-										onclick={() => openChat(t.createdBy)}
-									>💬</button>
-								{:else}
-									{@const o = item as OrderItem & { _kind: 'order' }}
-									<span class="action-num">{o.orderNumber}</span>
-									<button
-										class="action-icon"
-										type="button"
-										title="Detay"
-										onclick={() => openOrderModal(o)}
-									>🔗</button>
-									<button
-										class="action-icon"
-										type="button"
-										title="Mesaj gönder"
-										onclick={() => openChat(o.createdBy)}
-									>💬</button>
-								{/if}
-								<button
-									class="action-btn ghost ml-auto"
-									type="button"
-									onclick={() => (expandedId = null)}
-								>Kapat</button>
-							</div>
-						{/if}
+						</div>
 
 					</div>
 				{/each}

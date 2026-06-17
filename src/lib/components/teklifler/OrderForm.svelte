@@ -36,8 +36,29 @@
 
 	const isOwner = $derived(!editOrder || editOrder.createdBy === authStore.userId);
 
+	// ─── Active companies ────────────────────────────────────────────────────────
+	type CompanyRow = { id: string; name: string };
+	let activeCompanies = $state<CompanyRow[]>([]);
+
+	$effect(() => {
+		return db.subscribeQuery(
+			{ companies: { $: { where: { isActive: true } } } },
+			(result) => {
+				untrack(() => {
+					activeCompanies = (result.data?.companies ?? []) as CompanyRow[];
+				});
+			}
+		);
+	});
+
 	// ─── Form fields ─────────────────────────────────────────────────────────────
 	let companyId    = $state(authStore.activeCompanyId ?? authStore.companyIds[0] ?? '');
+
+	$effect(() => {
+		const cId = authStore.activeCompanyId ?? authStore.companyIds[0] ?? activeCompanies[0]?.id;
+		if (!cId) return;
+		untrack(() => { if (!companyId) companyId = cId; });
+	});
 	let currency     = $state('TRY');
 	let exchangeRate = $state(1);
 	let deliveryType    = $state('');
@@ -333,6 +354,7 @@
 					type="button"
 					onclick={save}
 					disabled={saving || !isOwner}
+					style={saving ? 'pointer-events: none' : ''}
 					title={!isOwner ? 'Bu siparişi düzenleme yetkiniz yok' : undefined}
 					class="flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-black transition hover:bg-[#e0e0e0] disabled:opacity-40 disabled:cursor-not-allowed"
 				>

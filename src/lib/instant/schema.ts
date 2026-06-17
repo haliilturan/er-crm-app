@@ -31,6 +31,8 @@ const schema = i.schema({
 			userId: i.string().optional().indexed(),
 			photoUrl: i.string().optional(),
 			phone: i.string().optional(),
+			// "sales" | "finance" | "production" | "purchasing" | "warehouse" | "management"
+			department: i.string().optional().indexed(),
 			createdAt: i.number(),
 			updatedAt: i.number().optional()
 		}),
@@ -341,7 +343,16 @@ const schema = i.schema({
 			createdBy: i.string(),
 			createdAt: i.number().indexed(),
 			updatedBy: i.string().optional(),
-			updatedAt: i.number().optional()
+			updatedAt: i.number().optional(),
+
+			hasReturn: i.boolean().optional(),
+			// "none" | "partial" | "full"
+			returnStatus: i.string().optional().indexed(),
+			// "defective" | "wrong_item" | "customer_request" | "other"
+			returnReason: i.string().optional(),
+			returnNotes: i.string().optional(),
+			returnedAt: i.number().optional(),
+			returnApprovedBy: i.string().optional()
 		}),
 
 		/**
@@ -374,7 +385,8 @@ const schema = i.schema({
 			descRU: i.string().optional(),
 			descAR: i.string().optional(),
 			descFR: i.string().optional(),
-			sortOrder: i.number()
+			sortOrder: i.number(),
+			returnedQuantity: i.number().optional()
 		}),
 
 		/**
@@ -484,16 +496,19 @@ const schema = i.schema({
 		// ─── Ödemeler ─────────────────────────────────────────────────────────────
 
 		payments: i.entity({
-			orderId:      i.string().indexed(),
-			customerId:   i.string().indexed(),
-			customerName: i.string(),
-			companyId:    i.string().indexed(),
-			amount:       i.number(),
-			currency:     i.string(),
-			paidAt:       i.number().indexed(),
-			note:         i.string().optional(),
-			recordedBy:   i.string(),
-			createdAt:    i.number().indexed()
+			orderId:          i.string().indexed(),
+			customerId:       i.string().indexed(),
+			customerName:     i.string(),
+			companyId:        i.string().indexed(),
+			amount:           i.number(),
+			currency:         i.string(),
+			paidAt:           i.number().indexed(),
+			note:             i.string().optional(),
+			recordedBy:       i.string(),
+			createdAt:        i.number().indexed(),
+			exchangeRate:     i.number().optional(),
+			exchangeRateDate: i.number().optional(),
+			amountUSD:        i.number().optional()
 		})
 	},
 

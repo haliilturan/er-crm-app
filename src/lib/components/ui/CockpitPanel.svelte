@@ -626,6 +626,7 @@
 							type="button"
 							onclick={saveTask}
 							disabled={saving}
+							style={saving ? 'pointer-events: none' : ''}
 							class="flex-1 bg-white text-black rounded-full px-4 py-2 text-xs font-medium transition-opacity disabled:opacity-50"
 						>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
 					</div>
@@ -807,6 +808,7 @@
 														type="button"
 														onclick={() => completeTask(task.id)}
 														disabled={completing === task.id}
+														style={completing === task.id ? 'pointer-events: none' : ''}
 														class="ml-auto px-3 py-1 rounded-full bg-white text-black text-[10px] font-semibold hover:bg-[#e8e8e8] transition-colors disabled:opacity-50"
 													>
 														{completing === task.id ? '…' : 'Tamamla'}

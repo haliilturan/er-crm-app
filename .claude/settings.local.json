@@ -58,7 +58,16 @@
       "PowerShell($env:INSTANT_ADMIN_KEY=\"ec56e094-29bb-4929-a56a-8f5eae6267d1\"; node scripts/cleanup-old-data.mjs)",
       "PowerShell($env:INSTANT_ADMIN_KEY=\"ec56e094-29bb-4929-a56a-8f5eae6267d1\"; npx instant-cli@latest push perms 2>&1)",
       "PowerShell(Get-Process *)",
-      "PowerShell($env:INSTANT_ADMIN_KEY=\"ec56e094-29bb-4929-a56a-8f5eae6267d1\"; echo \"y\" | npx instant-cli@latest push perms 2>&1)"
+      "PowerShell($env:INSTANT_ADMIN_KEY=\"ec56e094-29bb-4929-a56a-8f5eae6267d1\"; echo \"y\" | npx instant-cli@latest push perms 2>&1)",
+      "Bash(npx instant-cli@latest push perms)",
+      "Bash(Get-Content \"C:\\\\Users\\\\Halil\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\C--Users-Halil-Desktop-erp-crm\\\\fdf18b86-41eb-4bbb-a2e9-053d85989c35\\\\tasks\\\\b75qhbj5a.output\")",
+      "Bash(Select-Object -Last 20)",
+      "Bash(start *)",
+      "PowerShell(cd C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm; npx svelte-check --tsconfig ./tsconfig.json 2>&1 | Where-Object { $_ -match \"CustomerDetailCard|COMPLETED\" } | Select-Object -Last 5)",
+      "PowerShell(cd C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm; npx svelte-check --tsconfig ./tsconfig.json 2>&1 | Where-Object { $_ -match \"QuoteForm|COMPLETED\" } | Select-Object -Last 5)",
+      "PowerShell(cd C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm; npx svelte-check --tsconfig ./tsconfig.json 2>&1 | Where-Object { $_ -match \"OrderForm|COMPLETED\" } | Select-Object -Last 5)",
+      "PowerShell(cd C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm; npx svelte-check --tsconfig ./tsconfig.json 2>&1 | Where-Object { $_ -match \"QuoteForm|OrderForm|CustomerModal|COMPLETED\" } | Select-Object -Last 8)",
+      "PowerShell(cd C:\\\\Users\\\\Halil\\\\Desktop\\\\erp-crm; npx svelte-check --tsconfig ./tsconfig.json 2>&1 | Where-Object { $_ -match \"QuoteForm|OrderForm|COMPLETED\" } | Select-Object -Last 8)"
     ]
   },
   "enableAllProjectMcpServers": true,

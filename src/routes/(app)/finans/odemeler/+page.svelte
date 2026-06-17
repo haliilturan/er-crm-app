@@ -28,13 +28,16 @@
 		paymentStatus?: string;
 		createdAt: number;
 		payments?: Payment[];
+		customer?: { id: string; name?: string };
 	};
+
+	type PriceRow = { key: string; buy: number; sell: number; value: number; updatedAt?: number };
 
 	// ── State ──────────────────────────────────────────────────────────────────
 
-	let orders    = $state<Order[]>([]);
-	let loading   = $state(true);
-	let companyId = $derived(authStore.activeCompanyId ?? '');
+	let orders     = $state<Order[]>([]);
+	let loading    = $state(false);
+	let pricesMap  = $state<Record<string, PriceRow>>({});
 
 	// Modal
 	let modalOpen     = $state(false);
@@ -47,21 +50,38 @@
 	let saving       = $state(false);
 	let errorMsg     = $state('');
 
-	// ── Subscription ──────────────────────────────────────────────────────────
+	// ── Subscriptions ─────────────────────────────────────────────────────────
 
 	$effect(() => {
-		const cId = companyId;
-		if (!cId) return;
+		return db.subscribeQuery(
+			{ prices: { $: { where: { key: { in: ['USD', 'EUR', 'GBP'] } } } } },
+			(result) => {
+				pricesMap = Object.fromEntries(
+					(result.data?.prices ?? []).map((p: PriceRow) => [p.key, p])
+				);
+			}
+		);
+	});
+
+	$effect(() => {
+		const cId = authStore.activeCompanyId;
+		if (!cId || cId === '') return;
 		loading = true;
 		return db.subscribeQuery(
 			{
 				orders: {
 					$: { where: { companyId: cId }, order: { createdAt: 'desc' } },
-					payments: {}
+					payments: {},
+					customer: {}
 				}
 			},
 			(result) => {
 				untrack(() => {
+					if (result.error) {
+						console.error('[ödemeler] query error:', result.error);
+						loading = false;
+						return;
+					}
 					orders  = (result.data?.orders ?? []) as Order[];
 					loading = false;
 				});
@@ -138,6 +158,23 @@
 				newPaid >= total - 0.01 ? 'paid' :
 				newPaid > 0             ? 'partial' : 'unpaid';
 
+			const usdRate = pricesMap['USD']?.sell;
+			let amountUSDCalc: number | undefined;
+			if (usdRate) {
+				if (payCurrency === 'USD') {
+					amountUSDCalc = payAmount;
+				} else if (payCurrency === 'TRY') {
+					amountUSDCalc = payAmount / usdRate;
+				} else if (payCurrency === 'EUR' && pricesMap['EUR']?.sell) {
+					amountUSDCalc = payAmount * (pricesMap['EUR'].sell / usdRate);
+				} else if (payCurrency === 'GBP' && pricesMap['GBP']?.sell) {
+					amountUSDCalc = payAmount * (pricesMap['GBP'].sell / usdRate);
+				}
+				if (amountUSDCalc !== undefined) {
+					amountUSDCalc = Math.round(amountUSDCalc * 100) / 100;
+				}
+			}
+
 			await db.transact([
 				// Create payment record
 				tx.payments[payId].update({
@@ -150,7 +187,9 @@
 					paidAt:       paidAtTs,
 					note:         payNote || undefined,
 					recordedBy:   userId,
-					createdAt:    now
+					createdAt:    now,
+					...(usdRate != null ? { exchangeRate: usdRate, exchangeRateDate: now } : {}),
+					...(amountUSDCalc != null ? { amountUSD: amountUSDCalc } : {})
 				}),
 				// Link payment → order
 				tx.payments[payId].link({ order: activeOrder.id }),
@@ -200,7 +239,7 @@
 							<div class="min-w-0 flex-1">
 								<div class="flex items-center gap-2">
 									<p class="truncate text-sm font-medium text-white">
-										{order.customerName ?? 'Müşteri'}
+										{order.customerName ?? order.customer?.name ?? 'İsimsiz Müşteri'}
 									</p>
 									<Badge label={pb.label} variant={pb.variant} />
 								</div>
@@ -320,6 +359,7 @@
 			<button
 				onclick={savePayment}
 				disabled={saving || payAmount <= 0}
+				style={saving ? 'pointer-events: none' : ''}
 				class="rounded-lg border border-emerald-700 bg-emerald-900/40 px-4 py-2 text-sm text-emerald-300 transition hover:bg-emerald-800/50 disabled:opacity-40"
 			>
 				{saving ? 'Kaydediliyor…' : 'Kaydet'}

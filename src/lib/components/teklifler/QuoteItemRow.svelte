@@ -84,14 +84,13 @@
 	$effect(() => {
 		const open = searchOpen;
 		const q    = searchQuery.trim();
-		const cId  = companyId;
 
 		if (!open) { untrack(() => { displayProducts = []; }); return; }
 
 		if (q.length < 3) {
-			// Default: last 5 recently updated
+			// Default: last 5 recently updated active products
 			return db.subscribeQuery(
-				{ products: { $: { where: { companyId: cId }, order: { updatedAt: 'desc' }, limit: 5 } } },
+				{ products: { $: { where: { status: 'active' }, order: { updatedAt: 'desc' }, limit: 5 } } },
 				(result) => {
 					untrack(() => {
 						displayProducts = (result.data?.products ?? []) as ProductRaw[];
@@ -100,11 +99,11 @@
 				}
 			);
 		} else {
-			// Search: fetch all for this company, filter client-side, return top 5
+			// Search: fetch all active products, filter client-side, return top 5
 			untrack(() => { searching = true; });
 			const norm = normalize(q);
 			return db.subscribeQuery(
-				{ products: { $: { where: { companyId: cId } } } },
+				{ products: { $: { where: { status: 'active' } } } },
 				(result) => {
 					untrack(() => {
 						const all = (result.data?.products ?? []) as ProductRaw[];

@@ -3,18 +3,18 @@
 
 	type Step = 'email' | 'code';
 
-	let step = $state<Step>('email');
-	let email = $state('');
-	let code = $state('');
+	let step      = $state<Step>('email');
+	let email     = $state('');
+	let code      = $state('');
 	let isLoading = $state(false);
-	let errorMsg = $state('');
+	let errorMsg  = $state('');
 
 	async function sendCode(e: SubmitEvent) {
 		e.preventDefault();
 		const trimmed = email.trim();
 		if (!trimmed) return;
 		isLoading = true;
-		errorMsg = '';
+		errorMsg  = '';
 		try {
 			await db.auth.sendMagicCode({ email: trimmed });
 			step = 'code';
@@ -31,19 +31,19 @@
 		const trimmedCode = code.trim();
 		if (!trimmedCode) return;
 		isLoading = true;
-		errorMsg = '';
+		errorMsg  = '';
 		try {
 			await db.auth.signInWithMagicCode({ email: email.trim(), code: trimmedCode });
 		} catch (err: unknown) {
 			const msg = (err as { body?: { message?: string } })?.body?.message;
-			errorMsg = msg ?? 'Kod geçersiz veya süresi dolmuş. Lütfen tekrar deneyin.';
+			errorMsg  = msg ?? 'Kod geçersiz veya süresi dolmuş. Lütfen tekrar deneyin.';
 			isLoading = false;
 		}
 	}
 
 	function goBack() {
-		step = 'email';
-		code = '';
+		step     = 'email';
+		code     = '';
 		errorMsg = '';
 	}
 </script>
@@ -52,118 +52,121 @@
 	<title>Giriş — ERP-CRM</title>
 </svelte:head>
 
-<main class="flex min-h-screen items-center justify-center bg-[#0a0a0a] px-4">
-	<div class="w-full max-w-sm">
-		<!-- Logo / Başlık -->
-		<div class="mb-8 text-center">
-			<div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-[#1a1a1a] border border-[#2a2a2a]">
-				<svg class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-				</svg>
+<div class="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+	<div class="relative w-[900px] h-[600px] flex-shrink-0 ml-[50px]">
+
+		<!-- Sol küçük panel -->
+		<div class="absolute -left-[100px] top-1/2 -translate-y-1/2 w-[270px] h-[480px] bg-[#242424] rounded-[28px] border border-white/5 z-0"></div>
+
+		<!-- Sağ form paneli -->
+		<div class="absolute right-0 top-1/2 -translate-y-1/2 w-[680px] h-[480px] bg-[#242424] rounded-[28px] border border-white/5 z-0" style="box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5)">
+			<div class="absolute right-12 top-1/2 -translate-y-1/2 w-[320px] space-y-6">
+				<h2 class="text-xl font-medium text-gray-400">Email Authentication</h2>
+
+				<div class="space-y-4">
+					{#if step === 'email'}
+						<form onsubmit={sendCode} class="space-y-4">
+							<input
+								type="email"
+								bind:value={email}
+								placeholder="ornek@sirket.com"
+								autocomplete="email"
+								required
+								disabled={isLoading}
+								class="bg-[#2d2d2d] border-none rounded-xl py-4 px-5 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/20 w-full disabled:opacity-50"
+							/>
+
+							{#if errorMsg}
+								<p class="rounded-lg bg-red-950/30 border border-red-900/50 px-4 py-3 text-sm text-red-400">{errorMsg}</p>
+							{/if}
+
+							<button
+								type="submit"
+								disabled={isLoading || !email.trim()}
+								class="w-full bg-[#0a0a0a] text-white font-medium py-4 rounded-xl border border-white/10 hover:bg-black transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								{#if isLoading}
+									<span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+									Gönderiliyor...
+								{:else}
+									Kod gönder
+								{/if}
+							</button>
+						</form>
+
+					{:else}
+						<p class="text-sm text-gray-500">
+							<span class="text-gray-300">{email}</span> adresine 6 haneli kod gönderdik.
+						</p>
+
+						<form onsubmit={verifyCode} class="space-y-4">
+							<input
+								type="text"
+								bind:value={code}
+								placeholder="123456"
+								inputmode="numeric"
+								autocomplete="one-time-code"
+								maxlength="6"
+								required
+								disabled={isLoading}
+								class="bg-[#2d2d2d] border-none rounded-xl py-4 px-5 text-gray-200 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-white/20 w-full text-center text-lg font-mono tracking-[0.5em] disabled:opacity-50"
+							/>
+
+							{#if errorMsg}
+								<p class="rounded-lg bg-red-950/30 border border-red-900/50 px-4 py-3 text-sm text-red-400">{errorMsg}</p>
+							{/if}
+
+							<button
+								type="submit"
+								disabled={isLoading || code.trim().length < 6}
+								class="w-full bg-[#0a0a0a] text-white font-medium py-4 rounded-xl border border-white/10 hover:bg-black transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+							>
+								{#if isLoading}
+									<span class="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent"></span>
+									Doğrulanıyor...
+								{:else}
+									Giriş yap
+								{/if}
+							</button>
+
+							<button
+								type="button"
+								onclick={goBack}
+								disabled={isLoading}
+								class="w-full text-center text-sm text-gray-500 hover:text-gray-300 transition-colors disabled:opacity-50"
+							>
+								← Farklı e-posta kullan
+							</button>
+						</form>
+					{/if}
+				</div>
 			</div>
-			<h1 class="text-2xl font-bold text-white">ERP-CRM</h1>
-			<p class="mt-1 text-sm text-[#888]">Şirket yönetim paneli</p>
 		</div>
 
-		<!-- Kart -->
-		<div class="rounded-2xl bg-[#111111] border border-[#2a2a2a] p-8">
-			{#if step === 'email'}
-				<!-- Adım 1: E-posta -->
-				<div class="mb-6">
-					<h2 class="text-lg font-semibold text-white">Giriş yap</h2>
-					<p class="mt-1 text-sm text-[#888]">E-posta adresinize tek kullanımlık kod göndereceğiz.</p>
-				</div>
+		<!-- Merkez marka paneli -->
+		<div class="absolute left-[90px] top-1/2 -translate-y-1/2 z-10 w-[400px] h-[640px] bg-[#1a1a1a] rounded-[36px] border border-white/10 flex flex-col items-center justify-between py-14 px-8 text-center" style="box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5)">
 
-				<form onsubmit={sendCode} class="space-y-4">
-					<div>
-						<label for="email" class="block text-sm font-medium text-[#888]">E-posta</label>
-						<input
-							id="email"
-							type="email"
-							bind:value={email}
-							placeholder="ornek@sirket.com"
-							autocomplete="email"
-							required
-							disabled={isLoading}
-							class="mt-1 block w-full rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-3 py-2.5 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none focus:ring-1 focus:ring-[#555] disabled:opacity-50"
-						/>
-					</div>
+			<!-- Üst branding -->
+			<div class="space-y-2">
+				<h1 class="text-3xl font-bold tracking-tight whitespace-nowrap text-white">HLL International</h1>
+				<p class="text-gray-500 font-medium">Business Operating Systems</p>
+			</div>
 
-					{#if errorMsg}
-						<p class="rounded-lg bg-[#2a1a1a] border border-[#ff4444]/30 px-3 py-2 text-sm text-[#ff4444]">{errorMsg}</p>
-					{/if}
+			<!-- Logo -->
+			<div class="w-full flex justify-center">
+				<img
+					src="/hll-logo.png"
+					alt="HLL International"
+					class="max-h-64 object-contain"
+					style="filter: invert(1) brightness(2)"
+				/>
+			</div>
 
-					<button
-						type="submit"
-						disabled={isLoading || !email.trim()}
-						class="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-[#e0e0e0] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-					>
-						{#if isLoading}
-							<span class="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent"></span>
-							Gönderiliyor...
-						{:else}
-							Kod gönder
-						{/if}
-					</button>
-				</form>
-
-			{:else}
-				<!-- Adım 2: Kod doğrulama -->
-				<div class="mb-6">
-					<h2 class="text-lg font-semibold text-white">Kodu girin</h2>
-					<p class="mt-1 text-sm text-[#888]">
-						<span class="font-medium text-white">{email}</span> adresine 6 haneli kod gönderdik.
-					</p>
-				</div>
-
-				<form onsubmit={verifyCode} class="space-y-4">
-					<div>
-						<label for="code" class="block text-sm font-medium text-[#888]">Doğrulama kodu</label>
-						<input
-							id="code"
-							type="text"
-							bind:value={code}
-							placeholder="123456"
-							inputmode="numeric"
-							autocomplete="one-time-code"
-							maxlength="6"
-							required
-							disabled={isLoading}
-							class="mt-1 block w-full rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-3 py-2.5 text-center text-lg font-mono tracking-[0.5em] text-white placeholder-[#555] focus:border-[#555] focus:outline-none focus:ring-1 focus:ring-[#555] disabled:opacity-50"
-						/>
-					</div>
-
-					{#if errorMsg}
-						<p class="rounded-lg bg-[#2a1a1a] border border-[#ff4444]/30 px-3 py-2 text-sm text-[#ff4444]">{errorMsg}</p>
-					{/if}
-
-					<button
-						type="submit"
-						disabled={isLoading || code.trim().length < 6}
-						class="flex w-full items-center justify-center gap-2 rounded-xl bg-white px-4 py-2.5 text-sm font-medium text-black transition hover:bg-[#e0e0e0] focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-					>
-						{#if isLoading}
-							<span class="h-4 w-4 animate-spin rounded-full border-2 border-black border-t-transparent"></span>
-							Doğrulanıyor...
-						{:else}
-							Giriş yap
-						{/if}
-					</button>
-
-					<button
-						type="button"
-						onclick={goBack}
-						disabled={isLoading}
-						class="w-full text-center text-sm text-[#888] hover:text-white transition-colors disabled:opacity-50"
-					>
-						← Farklı e-posta kullan
-					</button>
-				</form>
-			{/if}
+			<!-- Alt yazı -->
+			<div>
+				<p class="text-gray-600 text-sm tracking-wide">Enterprise Resource Planning</p>
+			</div>
 		</div>
 
-		<p class="mt-6 text-center text-xs text-[#555]">
-			Şifre yok. Sadece e-posta.
-		</p>
 	</div>
-</main>
+</div>

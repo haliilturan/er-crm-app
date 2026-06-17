@@ -34,9 +34,9 @@
 
 	// ─── Static Options ───────────────────────────────────────────────────────
 	const TYPE_OPTIONS = [
-		{ value: 'Lead',          label: 'Lead'          },
-		{ value: 'Contact',       label: 'Contact'       },
-		{ value: 'Client',        label: 'Client'        },
+		{ value: 'Lead',          label: 'Aday'          },
+		{ value: 'Contact',       label: 'İletişim'      },
+		{ value: 'Client',        label: 'Müşteri'       },
 		{ value: 'Son Kullanıcı', label: 'Son Kullanıcı' },
 		{ value: 'Aracı',         label: 'Aracı'         },
 		{ value: 'Tüccar',        label: 'Tüccar'        },
@@ -239,8 +239,6 @@
 				...(form.contactTitle.trim()    && { contactTitle:    form.contactTitle.trim()    })
 			};
 
-			console.log('Saving customer:', body);
-
 			if (isNew) {
 				const newId = id();
 				await db.transact([
@@ -376,18 +374,18 @@
 					}}
 				/>
 
+				<Select
+					label="İlçe"
+					bind:value={form.city}
+					options={cityOptions}
+					placeholder="İlçe seçin"
+				/>
+
 				<TextArea
 					label="Fatura Adresi"
 					bind:value={form.address}
 					placeholder="Sokak, mahalle, ilçe..."
 					rows={3}
-				/>
-
-				<Select
-					label="Şehir / İlçe"
-					bind:value={form.city}
-					options={cityOptions}
-					placeholder="Şehir seçin"
 				/>
 
 				<TextArea
@@ -464,6 +462,7 @@
 				<button
 					type="submit"
 					disabled={saving}
+					style={saving ? 'pointer-events: none' : ''}
 					class="rounded-full bg-white px-6 py-2.5 text-sm font-medium text-black transition-opacity disabled:opacity-50"
 				>
 					{saving ? 'Kaydediliyor...' : isNew ? 'Müşteri Oluştur' : 'Kaydet'}

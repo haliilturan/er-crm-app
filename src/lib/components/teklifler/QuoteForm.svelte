@@ -102,6 +102,21 @@
 		);
 	});
 
+	// ─── Active companies (Grup Şirket dropdown) ─────────────────────────────────
+	type CompanyRow = { id: string; name: string };
+	let activeCompanies = $state<CompanyRow[]>([]);
+
+	$effect(() => {
+		return db.subscribeQuery(
+			{ companies: { $: { where: { isActive: true } } } },
+			(result) => {
+				untrack(() => {
+					activeCompanies = (result.data?.companies ?? []) as CompanyRow[];
+				});
+			}
+		);
+	});
+
 	// ─── Company users (for task assignment) ─────────────────────────────────────
 	type CompanyUser = { userId: string; fullName: string };
 	let companyUsers = $state<CompanyUser[]>([]);
@@ -267,7 +282,14 @@
 	// ─── Form fields ─────────────────────────────────────────────────────────────
 	let currency          = $state('TRY');
 	let exchangeRate      = $state<number>(1);
+	// Senkron: mount anında zaten yüklüyse hemen doldur; async: effect ile yakala
 	let companyId         = $state(authStore.activeCompanyId ?? authStore.companyIds[0] ?? '');
+
+	$effect(() => {
+		const cId = authStore.activeCompanyId ?? authStore.companyIds[0] ?? activeCompanies[0]?.id;
+		if (!cId) return;
+		untrack(() => { if (!companyId) companyId = cId; });
+	});
 	let deliveryType      = $state('');
 	let deliveryFirm      = $state('');
 	let deliveryPayment   = $state('');
@@ -411,8 +433,11 @@
 	}
 
 	async function saveToDb(): Promise<string | null> {
-		// Kaydetmeden önce kuru güncelle (hata olursa sessizce geç)
-		await refreshRates();
+		if (saving) return null;
+		saving    = true;   // ← guard'ın hemen altında, herhangi bir await'ten önce
+		saveError = '';
+
+		try { await refreshRates(); } catch { /* sessizce geç */ }
 
 		// Güncel kuru forma yaz
 		if (currency !== 'TRY' && pricesMap[currency]) {
@@ -441,13 +466,11 @@
 		});
 
 		if (hatalar.length > 0) {
+			saving = false;
 			alert('Lütfen eksik alanları doldurun:\n\n• ' + hatalar.join('\n• '));
 			return null;
 		}
 		// ── / Validasyon ──────────────────────────────────────────────────────────
-
-		saving    = true;
-		saveError = '';
 
 		const actorName = companyUsers.find((u) => u.userId === userId)?.fullName
 			?? authStore.userEmail?.split('@')[0]
@@ -1126,6 +1149,7 @@
 						type="button"
 						onclick={sendToFinance}
 						disabled={sendingToFinance || saving}
+						style={sendingToFinance || saving ? 'pointer-events: none' : ''}
 						class="flex items-center gap-1.5 rounded-full border border-violet-700 bg-violet-900/30 px-3 py-1.5 text-sm text-violet-300 transition-colors hover:bg-violet-800/40 disabled:opacity-50"
 						title="Finans onayına gönder"
 					>
@@ -1141,6 +1165,7 @@
 					type="button"
 					onclick={save}
 					disabled={saving}
+					style={saving ? 'pointer-events: none' : ''}
 					class="flex items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-black transition hover:bg-[#e0e0e0] disabled:opacity-40 disabled:cursor-not-allowed"
 				>
 					{#if saving}
@@ -1203,7 +1228,7 @@
 						bind:value={companyId}
 						class="w-full rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white focus:border-[#555] focus:outline-none"
 					>
-						{#each authStore.companies as c (c.id)}
+						{#each activeCompanies as c (c.id)}
 							<option value={c.id}>{c.name}</option>
 						{/each}
 					</select>
@@ -1573,6 +1598,7 @@
 			type="button"
 			onclick={createTask}
 			disabled={taskSaving}
+			style={taskSaving ? 'pointer-events: none' : ''}
 			class="px-5 py-2 rounded-xl bg-indigo-600 text-white text-sm font-medium
 				hover:bg-indigo-500 transition-colors disabled:opacity-50"
 		>{taskSaving ? 'Kaydediliyor…' : 'Görevi Oluştur'}</button>

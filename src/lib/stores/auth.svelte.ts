@@ -8,14 +8,16 @@ export interface CompanyInfo {
 	role: string;
 }
 
-let _userId    = $state<string | null>(null);
-let _userEmail = $state<string | null>(null);
-let _ready     = $state(false);
-let _companies = $state<CompanyInfo[]>([]);
-let _filter    = $state<string | 'all'>('all');
+let _userId     = $state<string | null>(null);
+let _userEmail  = $state<string | null>(null);
+let _ready      = $state(false);
+let _companies  = $state<CompanyInfo[]>([]);
+let _filter     = $state<string | 'all'>('all');
+let _department = $state<string | null>(null);
 
 let _unsubAuth:      (() => void) | null = null;
 let _unsubCompanies: (() => void) | null = null;
+let _unsubProfile:   (() => void) | null = null;
 
 async function ensureProfile(uid: string, email: string): Promise<void> {
 	try {
@@ -47,8 +49,10 @@ export const authStore = {
 	get companies(): CompanyInfo[]  { return _companies; },
 	get companyIds(): string[]      { return _companies.map((c) => c.id); },
 	get activeFilter(): string | 'all' { return _filter; },
-	get isAdmin():  boolean { return _companies.some((c) => c.role === 'admin'); },
-	get isFinans(): boolean { return _companies.some((c) => c.role === 'finans' || c.role === 'admin'); },
+	get isAdmin():         boolean         { return _companies.some((c) => c.role === 'admin'); },
+	get isFinans():        boolean         { return _companies.some((c) => c.role === 'finans' || c.role === 'admin'); },
+	get department():      string | null   { return _department; },
+	get isFinansOrAdmin(): boolean         { return this.isAdmin || _department === 'finance'; },
 
 	/** Sorgu yazarken kullanılacak şirket ID'si (filtre seçiliyse o, yoksa ilk) */
 	get activeCompanyId(): string | null {
@@ -68,11 +72,23 @@ export const authStore = {
 			if (uid && email) ensureProfile(uid, email);
 
 			if (!uid) {
-				_companies = [];
+				_companies  = [];
+				_department = null;
 				_unsubCompanies?.();
 				_unsubCompanies = null;
+				_unsubProfile?.();
+				_unsubProfile = null;
 				return;
 			}
+
+			_unsubProfile?.();
+			_unsubProfile = db.subscribeQuery(
+				{ userProfiles: { $: { where: { email: email! } } } },
+				(result) => {
+					const profile = (result.data?.userProfiles ?? [])[0] as any;
+					_department = profile?.department ?? null;
+				}
+			);
 
 			_unsubCompanies?.();
 			_unsubCompanies = db.subscribeQuery(
@@ -105,12 +121,15 @@ export const authStore = {
 	destroy(): void {
 		_unsubAuth?.();
 		_unsubCompanies?.();
+		_unsubProfile?.();
 		_unsubAuth      = null;
 		_unsubCompanies = null;
-		_userId    = null;
-		_userEmail = null;
-		_ready     = false;
-		_companies = [];
-		_filter    = 'all';
+		_unsubProfile   = null;
+		_userId     = null;
+		_userEmail  = null;
+		_ready      = false;
+		_companies  = [];
+		_filter     = 'all';
+		_department = null;
 	}
 };

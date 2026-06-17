@@ -137,6 +137,7 @@
 						type="button"
 						onclick={complete}
 						disabled={completing}
+						style={completing ? 'pointer-events: none' : ''}
 						class="px-3 py-1 rounded-full bg-white text-black text-xs font-medium
 							hover:bg-[#e0e0e0] transition-colors disabled:opacity-50"
 					>

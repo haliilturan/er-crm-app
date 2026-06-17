@@ -1,4 +1,4 @@
-<script lang="ts">
+﻿<script lang="ts">
 	import { onMount, onDestroy, untrack } from 'svelte';
 	import { db, id, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
@@ -79,6 +79,7 @@
 		productionDuration?: string;
 		bankAccount?: string;
 		purchaseOrderNumber?: string;
+		payments?: PaymentRow[];
 	};
 
 	type ItemRow = {
@@ -110,6 +111,32 @@
 		id: string;
 		userId?: string;
 		fullName?: string;
+	};
+
+	type PaymentRow = {
+		id: string;
+		orderId: string;
+		customerId?: string;
+		companyId?: string;
+		amount: number;
+		currency: string;
+		paidAt: number;
+		note?: string;
+		recordedBy?: string;
+		createdAt: number;
+		exchangeRate?: number;
+		exchangeRateDate?: number;
+		amountUSD?: number;
+	};
+
+	type PriceRow = {
+		key: string;
+		buy: number;
+		sell: number;
+		value: number;
+		change?: string;
+		direction?: number;
+		updatedAt?: number;
 	};
 
 	type DescKey = 'descTR' | 'descEN' | 'descRU' | 'descAR' | 'descFR';
@@ -260,13 +287,14 @@
 
 	let allOrderItems   = $state<ItemRow[]>([]);
 	let userProfileMap  = $state<Record<string, { id: string; name: string }>>({});
+	let pricesMap       = $state<Record<string, PriceRow>>({});
 
 	let detailOpen    = $state(false);
-	let detailType    = $state<'quote' | 'order'>('quote');
 	let detailEntity  = $state<OrderRow | null>(null);
 
 	let editingStatus = $state(false);
 	let statusSaving  = $state(false);
+	let actionSaving  = $state(false);
 	let detailLoading = $state(false);
 
 	let detailItems = $derived(
@@ -280,6 +308,44 @@
 	);
 
 	let noteValid = $derived(noteForm.content.trim().length > 0);
+
+	let customerTotalsByCurrency = $derived.by(() => {
+		const byCur: Record<string, {
+			totalDebt: number; totalPaid: number; totalDebtUSD: number; totalPaidUSD: number;
+			forexFixed: number; forexToday: number; hasForex: boolean;
+		}> = {};
+		for (const order of orders) {
+			const cur = order.currency || 'TRY';
+			if (!byCur[cur]) byCur[cur] = {
+				totalDebt: 0, totalPaid: 0, totalDebtUSD: 0, totalPaidUSD: 0,
+				forexFixed: 0, forexToday: 0, hasForex: false
+			};
+			const paid = calcOrderPaid(order);
+			byCur[cur].totalDebt += order.totalWithVat;
+			byCur[cur].totalPaid += paid;
+			byCur[cur].totalDebtUSD += toUSD(order.totalWithVat, cur);
+			byCur[cur].totalPaidUSD += toUSD(paid, cur);
+			for (const payment of (order.payments ?? [])) {
+				if (payment.amountUSD != null) {
+					byCur[cur].forexFixed += payment.amountUSD;
+					byCur[cur].forexToday += toUSD(payment.amount, payment.currency);
+					byCur[cur].hasForex = true;
+				}
+			}
+		}
+		return byCur;
+	});
+
+	let allPaymentsTimeline = $derived.by(() =>
+		orders
+			.flatMap(o => (o.payments ?? []).map(p => ({ ...p, orderNumber: o.orderNumber ?? '' })))
+			.sort((a, b) => b.paidAt - a.paidAt)
+	);
+
+	let ratesUpdatedAt = $derived.by(() => {
+		const vals = Object.values(pricesMap);
+		return vals.length > 0 ? Math.max(...vals.map(p => p.updatedAt ?? 0)) : null;
+	});
 
 	// ─── Helpers ──────────────────────────────────────────────────────────────
 	function formatDate(ts: number): string {
@@ -305,6 +371,45 @@
 
 	function fmtPdf(amount: number, sym: string): string {
 		return (amount ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + ' ' + sym;
+	}
+
+	function toUSD(amount: number, currency: string): number {
+		if (currency === 'USD') return amount;
+		const usdSell = pricesMap['USD']?.sell;
+		if (currency === 'TRY') return usdSell ? amount / usdSell : 0;
+		const currSell = pricesMap[currency]?.sell;
+		return currSell && usdSell ? amount * (currSell / usdSell) : 0;
+	}
+
+	function canConvertToUSD(currency: string): boolean {
+		if (currency === 'USD') return false;
+		return !!(pricesMap['USD']?.sell) && (currency === 'TRY' || !!(pricesMap[currency]?.sell));
+	}
+
+	function calcOrderPaid(order: OrderRow): number {
+		return (order.payments ?? []).reduce((s, p) => s + p.amount, 0);
+	}
+
+	function calcOrderRemaining(order: OrderRow): number {
+		return Math.max(0, order.totalWithVat - calcOrderPaid(order));
+	}
+
+	function fmtUSD(amount: number): string {
+		return '≈ $' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	}
+
+	function fmtDollar(amount: number): string {
+		return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+	}
+
+	function displayUSD(amount: number, currency: string): string {
+		if (currency === 'USD') return '';
+		const usdSell = pricesMap['USD']?.sell;
+		if (!usdSell) return '≈ $-.--';
+		if (currency === 'TRY') return fmtUSD(amount / usdSell);
+		const currSell = pricesMap[currency]?.sell;
+		if (!currSell) return '≈ $-.--';
+		return fmtUSD(amount * (currSell / usdSell));
 	}
 
 	// ─── Timer ───────────────────────────────────────────────────────────────
@@ -333,7 +438,16 @@
 			}
 		);
 
-		return () => { cleanupAuth(); cleanupOrderItems(); cleanupProfiles(); };
+		const cleanupPrices = db.subscribeQuery(
+			{ prices: { $: { where: { key: { in: ['USD', 'EUR', 'GBP'] } } } } },
+			(result) => {
+				pricesMap = Object.fromEntries(
+					(result.data?.prices ?? []).map((p: PriceRow) => [p.key, p])
+				);
+			}
+		);
+
+		return () => { cleanupAuth(); cleanupOrderItems(); cleanupProfiles(); cleanupPrices(); };
 	});
 
 	// ─── Reset tab on customer change ─────────────────────────────────────────
@@ -411,7 +525,7 @@
 		if (!cId) return;
 
 		return db.subscribeQuery(
-			{ orders: { $: { where: { customerId: cId }, order: { createdAt: 'desc' } } } },
+			{ orders: { $: { where: { customerId: cId }, order: { createdAt: 'desc' } }, payments: {} } },
 			(result) => {
 				untrack(() => {
 					orders = (result.data?.orders ?? []) as OrderRow[];
@@ -466,12 +580,13 @@
 	}
 
 	function openDetailModal(type: 'quote' | 'order', entity: OrderRow) {
-		detailType   = type;
 		detailEntity = entity;
 		detailOpen   = true;
 	}
 
 	async function sendQuoteToFinance(quote: OrderRow) {
+		if (actionSaving) return;
+		actionSaving = true;
 		const now = Date.now();
 		try {
 			await db.transact([
@@ -489,11 +604,30 @@
 		} catch (e) {
 			console.error('[sendQuoteToFinance] Transaction detay:', JSON.stringify(e, null, 2));
 			throw e;
+		} finally {
+			actionSaving = false;
 		}
 	}
 
 	async function siparisIptalEt(orderId: string) {
-		await db.transact([tx.orders[orderId].update({ status: 'cancelled' })]);
+		if (actionSaving) return;
+		actionSaving = true;
+		const now = Date.now();
+		try {
+			await db.transact([
+				tx.orders[orderId].update({ status: 'draft', updatedAt: now }),
+				tx.orderStatusHistory[id()].update({
+					orderId,
+					fromStatus: 'in_production',
+					toStatus:   'draft',
+					changedBy:  authStore.userId!,
+					reason:     'İptal — teklife dönüştürüldü',
+					changedAt:  now
+				})
+			]);
+		} finally {
+			actionSaving = false;
+		}
 	}
 
 	function openLangModal(type: 'quote' | 'order', entity: OrderRow) {
@@ -1031,6 +1165,7 @@
 								<button
 									onclick={addNote}
 									disabled={noteSaving}
+									style={noteSaving ? 'pointer-events: none' : ''}
 									class="flex items-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-[#e0e0e0] disabled:opacity-50"
 								>
 									{#if noteSaving}
@@ -1135,8 +1270,10 @@
 												<button
 													type="button"
 													onclick={() => sendQuoteToFinance(quote)}
+													disabled={actionSaving}
+													style={actionSaving ? 'pointer-events: none' : ''}
 													title="Siparişe Dönüştür — Finans onayına gönder"
-													class="flex h-7 w-7 items-center justify-center rounded-lg border border-violet-700 bg-violet-900/20 text-violet-400 transition hover:bg-violet-800/40"
+													class="flex h-7 w-7 items-center justify-center rounded-lg border border-violet-700 bg-violet-900/20 text-violet-400 transition hover:bg-violet-800/40 disabled:opacity-40"
 												>
 													<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
 														<polyline points="20 6 9 17 4 12"/>
@@ -1227,8 +1364,10 @@
 												<button
 													type="button"
 													onclick={() => siparisIptalEt(order.id)}
+													disabled={actionSaving}
+													style={actionSaving ? 'pointer-events: none' : ''}
 													title="İptal Et"
-													class="flex h-7 items-center rounded-lg border border-red-900 bg-red-950/30 px-2 text-xs text-red-400 transition hover:bg-red-900/40"
+													class="flex h-7 items-center rounded-lg border border-red-900 bg-red-950/30 px-2 text-xs text-red-400 transition hover:bg-red-900/40 disabled:opacity-40"
 												>İptal</button>
 												<button
 													type="button"
@@ -1262,13 +1401,203 @@
 					</div>
 				{/if}
 
-			{:else}
-				<!-- Ödemeler (placeholder) -->
-				<div class="flex h-48 items-center justify-center rounded-xl border border-dashed border-[#2a2a2a]">
-					<div class="text-center">
-						<p class="text-sm font-medium text-[#888]">Ödemeler yakında</p>
-						<p class="mt-0.5 text-xs text-[#555]">Bu bölüm geliştirme aşamasında.</p>
-					</div>
+			{:else if tabValue === 'payments'}
+				<div class="flex flex-col gap-6 max-w-2xl">
+					{#if orders.length === 0}
+						<div class="rounded-xl border border-dashed border-[#2a2a2a] py-10 text-center">
+							<p class="text-sm text-[#888]">Henüz sipariş bulunmuyor</p>
+						</div>
+					{:else}
+						<!-- 1. Özet kartları para birimi bazında -->
+						{#each Object.entries(customerTotalsByCurrency) as [currency, totals] (currency)}
+							{@const remaining = totals.totalDebt - totals.totalPaid}
+							{@const remainingUSD = totals.totalDebtUSD - totals.totalPaidUSD}
+							<div>
+								<p class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#555]">{currency}</p>
+								<div class="grid grid-cols-4 gap-3">
+									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+										<p class="text-xs text-[#555]">Toplam Borç</p>
+										<p class="mt-1 text-sm font-bold text-white">{formatMoney(totals.totalDebt, currency)}</p>
+										<p class="mt-1 text-[11px] text-[#555]">Toplam sipariş tutarı</p>
+										{#if canConvertToUSD(currency) && totals.totalDebtUSD > 0}
+											<p class="mt-0.5 text-[10px] text-[#444]">{fmtUSD(totals.totalDebtUSD)}</p>
+										{/if}
+									</div>
+									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+										<p class="text-xs text-[#555]">Toplam Ödenen</p>
+										<p class="mt-1 text-sm font-bold text-emerald-400">{formatMoney(totals.totalPaid, currency)}</p>
+										<p class="mt-1 text-[11px] text-[#555]">Yapılan ödemeler</p>
+										{#if currency !== 'USD'}
+											<p class="mt-0.5 text-[10px] text-[#444]">{displayUSD(totals.totalPaid, currency)}</p>
+										{/if}
+									</div>
+									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+										<p class="text-xs text-[#555]">Kalan Bakiye</p>
+										<p class="mt-1 text-sm font-bold {remaining > 0 ? 'text-red-400' : remaining < 0 ? 'text-emerald-400' : 'text-[#888]'}">{formatMoney(Math.abs(remaining), currency)}</p>
+										<p class="mt-1 text-[11px] text-[#555]">{remaining > 0 ? 'Ödenmemiş bakiye' : remaining < 0 ? 'Fazla ödeme' : 'Ödemeler tamamlandı'}</p>
+										{#if canConvertToUSD(currency) && Math.abs(remaining) > 0}
+											<p class="mt-0.5 text-[10px] text-[#444]">{fmtUSD(toUSD(Math.abs(remaining), currency))}</p>
+										{/if}
+									</div>
+									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+										<p class="text-xs text-[#555]">USD Karşılığı</p>
+										<div class="mt-2 flex flex-col gap-1.5">
+											<div class="flex items-center justify-between">
+												<span class="text-[10px] text-[#555]">Borç</span>
+												<span class="text-xs font-medium text-white">{fmtDollar(totals.totalDebtUSD)}</span>
+											</div>
+											<div class="flex items-center justify-between">
+												<span class="text-[10px] text-[#555]">Ödenen</span>
+												<span class="text-xs font-medium text-emerald-400">{fmtDollar(totals.totalPaidUSD)}</span>
+											</div>
+											<div class="mt-0.5 flex items-center justify-between border-t border-[#222] pt-1.5">
+												<span class="text-[10px] text-[#555]">Kalan</span>
+												<span class="text-xs font-semibold {remainingUSD > 0 ? 'text-red-400' : 'text-emerald-400'}">{fmtDollar(Math.abs(remainingUSD))}</span>
+											</div>
+										{#if totals.hasForex}
+											{@const netEffect = totals.forexToday - totals.forexFixed}
+											<div class="mt-2 border-t border-[#222] pt-2">
+												<p class="mb-1.5 text-[10px] font-semibold text-[#555]">Döviz Etkisi</p>
+												<div class="flex items-center justify-between">
+													<span class="text-[10px] text-[#555]">Sabit (ödeme anı)</span>
+													<span class="text-[10px] text-[#888]">{fmtDollar(totals.forexFixed)}</span>
+												</div>
+												<div class="flex items-center justify-between">
+													<span class="text-[10px] text-[#555]">Bugünkü değer</span>
+													<span class="text-[10px] text-[#888]">{fmtDollar(totals.forexToday)}</span>
+												</div>
+												<div class="mt-0.5 flex items-center justify-between border-t border-[#1a1a1a] pt-1">
+													<span class="text-[10px] text-[#555]">Net etki</span>
+													<span class="text-[10px] font-semibold {netEffect >= 0 ? 'text-emerald-400' : 'text-red-400'}">{netEffect >= 0 ? '+' : '-'}{fmtDollar(Math.abs(netEffect))} {netEffect >= 0 ? '▲' : '▼'}</span>
+												</div>
+											</div>
+										{/if}
+										</div>
+									</div>
+								</div>
+							</div>
+						{/each}
+
+						<!-- 2. Sipariş bazlı liste -->
+						<div>
+							<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Sipariş Bazlı</p>
+							<div class="flex flex-col gap-3">
+								{#each orders as order (order.id)}
+									{@const paid = calcOrderPaid(order)}
+									{@const remaining = calcOrderRemaining(order)}
+									{@const sortedPayments = [...(order.payments ?? [])].sort((a, b) => b.paidAt - a.paidAt)}
+									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+										<div class="mb-3 flex items-center justify-between">
+											<div class="flex items-center gap-2">
+												<span class="text-sm font-bold text-white">{order.orderNumber}</span>
+												<span class="text-xs text-[#555]">·</span>
+												<span class="text-xs text-[#555]">{formatDate(order.createdAt)}</span>
+											</div>
+											{#if remaining === 0 && paid > 0}
+												<span class="rounded-full bg-emerald-400/10 px-2 py-0.5 text-xs font-medium text-emerald-400">Ödendi</span>
+											{:else if paid > 0}
+												<span class="rounded-full bg-amber-400/10 px-2 py-0.5 text-xs font-medium text-amber-400">Kısmen</span>
+											{:else}
+												<span class="rounded-full bg-[#222] px-2 py-0.5 text-xs font-medium text-[#555]">Ödenmedi</span>
+											{/if}
+										</div>
+										<div class="mb-3 border-b border-[#2a2a2a] pb-3">
+											<span class="text-sm text-[#888]">Toplam: </span>
+											<span class="text-sm font-semibold text-white">{formatMoney(order.totalWithVat, order.currency)}</span>
+											{#if canConvertToUSD(order.currency)}
+												<span class="ml-1 text-xs text-[#444]">({fmtUSD(toUSD(order.totalWithVat, order.currency))})</span>
+											{/if}
+										</div>
+										{#if sortedPayments.length === 0}
+											<p class="py-1 text-xs text-[#555]">Henüz ödeme yapılmamış</p>
+										{:else}
+											<div class="mb-3 flex flex-col gap-1.5">
+												{#each sortedPayments as payment (payment.id)}
+													{@const pTodayUSD = toUSD(payment.amount, payment.currency)}
+													{@const pFark = payment.amountUSD != null ? pTodayUSD - payment.amountUSD : null}
+													<div class="flex flex-col gap-0.5">
+														<div class="flex items-center gap-2 text-xs">
+															<span class="font-medium text-emerald-400">+{formatMoney(payment.amount, payment.currency)}</span>
+															{#if payment.currency !== 'USD'}
+																<span class="text-[#444]">({displayUSD(payment.amount, payment.currency)})</span>
+															{/if}
+															<span class="text-[#555]">·</span>
+															<span class="text-[#555]">{formatDate(payment.paidAt)}</span>
+															{#if payment.note}
+																<span class="text-[#555]">·</span>
+																<span class="max-w-32 truncate text-[#555]">{payment.note}</span>
+															{/if}
+														</div>
+														{#if payment.amountUSD != null && pFark != null}
+															<div class="flex items-center gap-2 text-[10px]">
+																<span class="text-[#555]">Ödeme anı: {fmtDollar(payment.amountUSD)}</span>
+																<span class="text-[#444]">·</span>
+																<span class="font-medium {pFark >= 0 ? 'text-emerald-400' : 'text-red-400'}">{pFark >= 0 ? '+' : '-'}{fmtDollar(Math.abs(pFark))} {pFark >= 0 ? '▲' : '▼'}</span>
+															</div>
+															{#if payment.exchangeRate && pricesMap['USD']?.sell}
+																<p class="text-[10px] text-[#444]">Ödeme anı kuru: 1 USD = {payment.exchangeRate.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TRY · Bugün: {pricesMap['USD'].sell.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TRY</p>
+															{/if}
+														{/if}
+													</div>
+												{/each}
+											</div>
+										{/if}
+										<div class="border-t border-[#1e1e1e] pt-2">
+											{#if remaining === 0 && paid > 0}
+												<span class="text-xs font-medium text-emerald-400">Kalan: {formatMoney(0, order.currency)} ✓</span>
+											{:else if remaining > 0}
+												<span class="text-xs text-red-400">− Kalan: {formatMoney(remaining, order.currency)}</span>
+												{#if canConvertToUSD(order.currency)}
+													<span class="ml-1 text-[10px] text-[#444]">({fmtUSD(toUSD(remaining, order.currency))})</span>
+												{/if}
+											{:else}
+												<span class="text-xs text-[#555]">Kalan: {formatMoney(0, order.currency)}</span>
+											{/if}
+										</div>
+									</div>
+								{/each}
+							</div>
+						</div>
+
+						<!-- 3. Genel ödeme timeline'ı -->
+						{#if allPaymentsTimeline.length > 0}
+							<div>
+								<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Ödeme Geçmişi</p>
+								<div class="flex flex-col gap-2 rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+									{#each allPaymentsTimeline as payment (payment.id)}
+										{@const tlTodayUSD = toUSD(payment.amount, payment.currency)}
+										{@const tlFark = payment.amountUSD != null ? tlTodayUSD - payment.amountUSD : null}
+										<div class="flex flex-col gap-0.5">
+											<div class="flex items-center gap-2 text-xs">
+												<span class="shrink-0 font-medium text-emerald-400">+{formatMoney(payment.amount, payment.currency)}</span>
+												{#if payment.currency !== 'USD'}
+													<span class="shrink-0 text-[#444]">({displayUSD(payment.amount, payment.currency)})</span>
+												{/if}
+												<span class="text-[#555]">→</span>
+												<span class="shrink-0 text-[#666]">{payment.orderNumber}</span>
+												<span class="text-[#555]">·</span>
+												<span class="text-[#555]">{formatDate(payment.paidAt)}</span>
+											</div>
+											{#if payment.amountUSD != null && tlFark != null}
+												<div class="flex items-center gap-2 text-[10px]">
+													<span class="text-[#555]">Ödeme anı: {fmtDollar(payment.amountUSD)}</span>
+													<span class="text-[#444]">·</span>
+													<span class="font-medium {tlFark >= 0 ? 'text-emerald-400' : 'text-red-400'}">{tlFark >= 0 ? '+' : '-'}{fmtDollar(Math.abs(tlFark))} {tlFark >= 0 ? '▲' : '▼'}</span>
+												</div>
+											{/if}
+										</div>
+									{/each}
+								</div>
+							</div>
+						{/if}
+
+						<!-- 4. Kur notu -->
+						{#if Object.keys(pricesMap).length > 0}
+							<p class="text-[11px] text-[#444]">
+								Kurlar:{#if pricesMap['USD']} 1 USD = {pricesMap['USD'].sell.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TRY{/if}{#if pricesMap['EUR']} · 1 EUR = {pricesMap['EUR'].sell.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TRY{/if}{#if pricesMap['GBP']} · 1 GBP = {pricesMap['GBP'].sell.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} TRY{/if}{#if ratesUpdatedAt} · Son güncelleme: {new Date(ratesUpdatedAt).toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' })}{/if}
+							</p>
+						{/if}
+					{/if}
 				</div>
 			{/if}
 		</div>
@@ -1336,7 +1665,6 @@
 <!-- ─── Detail modal ─────────────────────────────────────────────────────── -->
 {#if detailOpen && detailEntity}
 	{@const de = detailEntity}
-	{@const isQ = detailType === 'quote'}
 	<div
 		class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
 		role="dialog"
