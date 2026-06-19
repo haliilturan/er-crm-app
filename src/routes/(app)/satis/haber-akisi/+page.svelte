@@ -1,8 +1,8 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { SvelteDate } from 'svelte/reactivity';
 	import { db } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
-	import { cockpit } from '$lib/stores/cockpit.svelte';
 	import { Tabs, ListItemCard, SearchInput } from '$lib/components/ui';
 
 	// ── Types ──────────────────────────────────────────────────────────────────
@@ -78,11 +78,6 @@
 	let modalOpen      = $state(false);
 	let modalOrder     = $state<OrderItem | null>(null);
 
-	function openOrderModal(order: OrderItem) {
-		modalOrder = order;
-		modalOpen  = true;
-	}
-
 	function closeModal() {
 		modalOpen  = false;
 		modalOrder = null;
@@ -90,7 +85,7 @@
 
 	// Tarih yardımcıları
 	function todayLocal(): Date {
-		const d = new Date();
+		const d = new SvelteDate();
 		d.setHours(0, 0, 0, 0);
 		return d;
 	}
@@ -109,19 +104,19 @@
 	let windowStart = $state<Date>(_ws);
 
 	function shiftWindow(dir: -1 | 1) {
-		const d = new Date(windowStart);
+		const d = new SvelteDate(windowStart);
 		d.setDate(d.getDate() + dir * 7);
 		windowStart = d;
 	}
 
 	// ── Derived ────────────────────────────────────────────────────────────────
 
-	let companyId = $derived(authStore.activeCompanyId ?? '');
+	let companyIds = $derived(authStore.companyIds);
 
 	const visibleDays = $derived((() => {
 		const days: { date: Date; key: string; label: string; dayName: string }[] = [];
 		for (let i = 0; i < 7; i++) {
-			const d = new Date(windowStart);
+			const d = new SvelteDate(windowStart);
 			d.setDate(d.getDate() + i);
 			const key     = dateKey(d);
 			const dayName = d.toLocaleDateString('tr-TR', { weekday: 'short' }).toUpperCase().slice(0, 2);
@@ -133,10 +128,6 @@
 
 	const profileByUserId = $derived(
 		Object.fromEntries(userList.map(u => [u.userId, u.profile]))
-	);
-
-	const roleByUserId = $derived(
-		Object.fromEntries(userList.map(u => [u.userId, u.role]))
 	);
 
 	const orderById = $derived(
@@ -189,22 +180,22 @@
 	// ── Subscription ──────────────────────────────────────────────────────────
 
 	$effect(() => {
-		const cId = companyId;
-		if (!cId) return;
+		const cIds = companyIds;
+		if (!cIds.length) return;
 		loading = true;
 
 		return db.subscribeQuery(
 			{
 				tasks: {
-					$: { where: { companyId: cId }, order: { createdAt: 'desc' } }
+					$: { where: { companyId: { in: cIds } }, order: { createdAt: 'desc' } }
 				},
 				orders: {
-					$: { where: { companyId: cId }, order: { createdAt: 'desc' } },
+					$: { where: { companyId: { in: cIds } }, order: { createdAt: 'desc' } },
 					customer: {},
 					items: {}
 				},
 				userCompanies: {
-					$: { where: { companyId: cId } },
+					$: { where: { companyId: { in: cIds } } },
 					profile: {}
 				}
 			},
@@ -253,11 +244,6 @@
 	function fmt(n: number, currency = 'TRY'): string {
 		const sym: Record<string, string> = { TRY: '₺', USD: '$', EUR: '€', GBP: '£' };
 		return `${sym[currency] ?? ''}${n.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-	}
-
-	function openChat(userId: string) {
-		cockpit.setSection('chats');
-		cockpit.setChat(userId);
 	}
 
 	const ORDER_STATUS: Record<string, { label: string }> = {
@@ -352,13 +338,13 @@
 		<!-- Feed listesi -->
 		<div class="feed-list">
 			{#if loading}
-				{#each Array(5) as _, i (i)}
+				{#each Array(5) as _k (_k)}
 					<div class="skeleton"></div>
 				{/each}
 			{:else if feedItems.length === 0}
 				<div class="empty-state">Bu tarihte kayıt yok</div>
 			{:else}
-				{#each feedItems as item (item.id)}
+				{#each feedItems as item (item._kind + '-' + item.id)}
 					{@const profile  = profileByUserId[item.createdBy]}
 					{@const name     = profile?.fullName ?? 'Personel'}
 
@@ -410,8 +396,11 @@
 
 	{#if modalOpen && modalOrder}
 		{@const o = modalOrder}
-		<!-- svelte-ignore a11y-no-static-element-interactions -->
+		<!-- svelte-ignore a11y_no_static_element_interactions -->
+		<!-- svelte-ignore a11y_click_events_have_key_events -->
 		<div class="modal-backdrop" onclick={closeModal}>
+			<!-- svelte-ignore a11y_no_static_element_interactions -->
+			<!-- svelte-ignore a11y_click_events_have_key_events -->
 			<div class="modal-box" onclick={(e) => e.stopPropagation()}>
 
 				<div class="modal-header">
@@ -579,6 +568,7 @@
 .date-strip {
 	display: flex;
 	align-items: center;
+	justify-content: center;
 	gap: var(--s-4);
 	padding: var(--s-12) var(--s-16);
 	border-bottom: 1px solid var(--border);
@@ -608,7 +598,6 @@
 .date-days {
 	display: flex;
 	gap: var(--s-4);
-	flex: 1;
 	justify-content: center;
 }
 
