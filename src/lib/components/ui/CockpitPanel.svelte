@@ -1,7 +1,8 @@
 <script lang="ts">
-	import { untrack, tick } from 'svelte';
+	import { untrack, tick, onMount } from 'svelte';
 	import { SvelteDate, SvelteSet } from 'svelte/reactivity';
 	import { ChevronLeft, ChevronRight, MessageCircle, Share2 } from 'lucide-svelte';
+	import { goto } from '$app/navigation';
 	import SearchInput from './SearchInput.svelte';
 	import TextInput from './TextInput.svelte';
 	import TextArea from './TextArea.svelte';
@@ -11,13 +12,77 @@
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { chatBridge } from '$lib/stores/chat.svelte';
 
+	const resolve = (path: string) => path as Parameters<typeof goto>[0];
+
 	type CockpitTab = 'tasks' | 'chats' | 'pulse';
+
+	interface Task {
+		id: string; title?: string; description?: string;
+		status: string; assignedTo?: string; createdBy?: string;
+		dueAt?: number; createdAt: number; companyId?: string;
+		orderId?: string; relatedEntityType?: string; relatedEntityId?: string;
+	}
+	interface Activity {
+		id: string; type: string; actorName?: string;
+		description?: string; relatedEntityNumber?: string; createdAt: number;
+	}
+	interface Message {
+		id: string; senderId: string; receiverId: string;
+		content?: string; createdAt: number; readAt?: number;
+	}
+	interface UserProfile {
+		id: string; userId?: string; email?: string; fullName?: string;
+	}
+	interface Order {
+		id: string; orderNumber?: string; status?: string;
+		totalWithVat?: number; currency?: string;
+		customer?: { id: string; name?: string };
+	}
 
 	let activeTab    = $state<CockpitTab>('tasks');
 	let taskSubTab   = $state<'received' | 'quote_tracking' | 'sent' | 'new'>('received');
 	let chatSearch   = $state('');
 	let expandedId   = $state<string | null>(null);
 	let completing   = $state<string | null>(null);
+
+	// ─── Settings ────────────────────────────────────────────────────────────
+	let showSettings = $state(false);
+	let theme        = $state<'dark' | 'light'>('dark');
+	let lang         = $state<'tr' | 'en'>('tr');
+
+	onMount(() => {
+		const savedTheme = localStorage.getItem('theme') as 'dark' | 'light' | null;
+		const savedLang  = localStorage.getItem('lang') as 'tr' | 'en' | null;
+		theme = savedTheme ?? 'dark';
+		lang  = savedLang ?? 'tr';
+		applyTheme(theme);
+	});
+
+	function applyTheme(t: 'dark' | 'light') {
+		if (t === 'dark') {
+			document.documentElement.classList.add('dark');
+		} else {
+			document.documentElement.classList.remove('dark');
+		}
+	}
+
+	function setTheme(t: 'dark' | 'light') {
+		theme = t;
+		localStorage.setItem('theme', t);
+		applyTheme(t);
+	}
+
+	function setLang(l: 'tr' | 'en') {
+		lang = l;
+		localStorage.setItem('lang', l);
+	}
+
+	function signOut() {
+		db.auth.signOut();
+		authStore.destroy();
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
+		void goto(resolve('/login'));
+	}
 
 	// ─── Date / week navigation ───────────────────────────────────────────────
 	const TR_DAYS = ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
@@ -33,11 +98,10 @@
 	let weekOffset = $state(0);
 
 	const weekDays = $derived.by(() => {
-		// Pure timestamp arithmetic — no Date mutation
-		const now    = activeDateObj.getTime(); // reactive via SvelteDate
-		const tmpDow = activeDateObj.getDay();
-		const diff   = tmpDow === 0 ? 6 : tmpDow - 1;
-		const monMs  = now - diff * 86_400_000 + weekOffset * 7 * 86_400_000;
+		const tmpDow   = activeDateObj.getDay();
+		const diff     = tmpDow === 0 ? 6 : tmpDow - 1;
+		const midnight = new Date(activeDateObj.getFullYear(), activeDateObj.getMonth(), activeDateObj.getDate());
+		const monMs    = midnight.getTime() - diff * 86_400_000 + weekOffset * 7 * 86_400_000;
 		return Array.from({ length: 7 }, (_, i) => {
 			const d = new Date(monMs + i * 86_400_000);
 			return { key: toLocalDateStr(d), label: TR_DAYS[d.getDay()], date: d.getDate() };
@@ -47,23 +111,24 @@
 	function selectDay(key: string) {
 		const [y, m, d] = key.split('-').map(Number);
 		activeDateObj.setFullYear(y, m - 1, d);
+		weekOffset = 0;
 	}
 
 	// ─── Tasks subscription ───────────────────────────────────────────────────
-	let tasks        = $state<any[]>([]);
+	let tasks        = $state<Task[]>([]);
 	let tasksLoading = $state(true);
 
 	$effect(() => {
 		const uid = authStore.userId;
 		if (!uid) return;
 		return db.subscribeQuery(
-			{ tasks: { $: { where: { assignedTo: uid }, order: { createdAt: 'desc' } } } },
+			{ tasks: { $: { where: { or: [{ assignedTo: uid }, { createdBy: uid }] }, order: { createdAt: 'desc' } } } },
 			(res) => { untrack(() => { tasks = res.data?.tasks ?? []; tasksLoading = false; }); }
 		);
 	});
 
 	// ─── ActivityFeed subscription ────────────────────────────────────────────
-	let activities        = $state<any[]>([]);
+	let activities        = $state<Activity[]>([]);
 	let activitiesLoading = $state(true);
 
 	$effect(() => {
@@ -76,7 +141,7 @@
 	});
 
 	// ─── Orders map (for order tracking tasks) ───────────────────────────────
-	let ordersMap = $state<Record<string, any>>({});
+	let ordersMap = $state<Record<string, Order>>({});
 
 	$effect(() => {
 		const cid = authStore.activeCompanyId;
@@ -85,7 +150,7 @@
 			{ orders: { $: { where: { companyId: cid, status: { in: ['draft', 'pending_finance'] } } }, customer: {} } },
 			(res) => {
 				untrack(() => {
-					const list = (res.data?.orders ?? []) as any[];
+					const list = (res.data?.orders ?? []) as unknown as Order[];
 					ordersMap = Object.fromEntries(list.map((q) => [q.id, q]));
 				});
 			}
@@ -99,10 +164,10 @@
 		const uid = authStore.userId;
 		if (!uid) return;
 		return db.subscribeQuery(
-			{ customers: { $: { where: { assignedTo: uid } } } },
+			{ customers: {} },
 			(res) => {
 				untrack(() => {
-					formCustomers = (res.data?.customers ?? []).map((c: any) => ({
+					formCustomers = (res.data?.customers ?? []).map((c: { id: string; name?: string | null }) => ({
 						id: c.id, name: String(c.name ?? '')
 					}));
 				});
@@ -117,13 +182,32 @@
 	let toasts    = $state<Array<{ id: string; description: string; dismissible: boolean }>>([]);
 
 	async function saveTask() {
+		console.log('[saveTask] called');
 		const uid = authStore.userId;
-		const cid = authStore.activeCompanyId;
-		if (!uid || !cid) return;
-		if (!newTask.title.trim()) { formError = 'Başlık zorunludur.'; return; }
+		if (!uid) {
+			console.log('[saveTask] no uid');
+			return;
+		}
+
+		const cid = authStore.companyIds[0] ?? authStore.activeCompanyId;
+		if (!cid) {
+			console.log('[saveTask] no companyId — companies:', authStore.companies);
+			saving = false;
+			return;
+		}
+		if (!newTask.title.trim()) {
+			console.log('[saveTask] early exit — title empty');
+			formError = 'Başlık zorunludur.'; return;
+		}
 		saving = true; formError = '';
 		try {
 			const newId = id();
+			console.log('[saveTask] firing', JSON.stringify({
+				title:      newTask.title,
+				assignedTo: newTask.assignedTo,
+				companyId:  authStore.activeCompanyId,
+				uid:        authStore.userId
+			}));
 			await db.transact([
 				tx.tasks[newId].update({
 					title:      newTask.title.trim(),
@@ -152,10 +236,21 @@
 		}
 	}
 
-	async function completeTask(taskId: string) {
-		completing = taskId;
+	async function completeTask(task: Task) {
+		completing = task.id;
 		try {
-			await db.transact([tx.tasks[taskId].update({ status: 'done' })]);
+			await db.transact([
+				tx.tasks[task.id].update({ status: 'done' }),
+				tx.notifications[id()].update({
+					userId:    task.createdBy,
+					type:      'task_completed',
+					title:     'Görev Tamamlandı',
+					body:      `"${task.title}" görevi tamamlandı.`,
+					entityId:  task.id,
+					companyId: task.companyId,
+					createdAt: Date.now()
+				})
+			]);
 			expandedId = null;
 		} finally {
 			completing = null;
@@ -181,7 +276,7 @@
 		return `${Math.floor(h / 24)}g önce`;
 	}
 
-	function taskStatus(t: any): 'pending' | 'overdue' | 'done' | 'dismissed' {
+	function taskStatus(t: Task): 'pending' | 'overdue' | 'done' | 'dismissed' {
 		if (t.status === 'done')      return 'done';
 		if (t.status === 'dismissed') return 'dismissed';
 		if (t.dueAt && t.dueAt < Date.now()) return 'overdue';
@@ -197,10 +292,6 @@
 	};
 
 	function activityLabel(type: string): string { return ACTIVITY_LABELS[type] ?? type; }
-	function activityDesc(a: any): string {
-		return a.relatedEntityNumber ?? a.customerCompanyName ?? a.actorName ?? '';
-	}
-
 	function daysSince(ts: number): number {
 		return Math.floor((Date.now() - ts) / 86_400_000);
 	}
@@ -210,10 +301,10 @@
 	}
 
 	// ─── Profiles for Chats ─────────────────────────────────────────────────
-	let allProfiles     = $state<any[]>([]);
+	let allProfiles     = $state<UserProfile[]>([]);
 	let profilesLoading = $state(true);
-	let selectedChat    = $state<{ userId: string; profile: any } | null>(null);
-	let messages        = $state<any[]>([]);
+	let selectedChat    = $state<{ userId: string; profile: UserProfile } | null>(null);
+	let messages        = $state<Message[]>([]);
 	let messagesLoading = $state(true);
 	let messageInput    = $state('');
 	let chatScrollEl    = $state<HTMLElement | null>(null);
@@ -225,7 +316,7 @@
 			{ userProfiles: {} },
 			(res) => {
 				untrack(() => {
-					const all = (res.data?.userProfiles ?? []) as any[];
+					const all = (res.data?.userProfiles ?? []) as unknown as UserProfile[];
 					allProfiles     = all.filter((p) => p.userId !== uid);
 					profilesLoading = false;
 				});
@@ -277,11 +368,11 @@
 			: allProfiles
 	);
 
-	function displayName(profile: any): string {
+	function displayName(profile: UserProfile | null | undefined): string {
 		return profile?.fullName || profile?.email?.split('@')[0] || 'Kullanıcı';
 	}
 
-	function initials(profile: any): string {
+	function initials(profile: UserProfile | null | undefined): string {
 		return displayName(profile)
 			.split(' ')
 			.slice(0, 2)
@@ -292,7 +383,7 @@
 
 	async function teklifLinkiKopyala(orderId: string) {
 		const order = ordersMap[orderId];
-		const customerId = (order?.customer as any)?.id;
+		const customerId = order.customer?.id;
 		const link = customerId
 			? `${window.location.origin}/satis/musteriler/${customerId}/teklifler`
 			: `${window.location.origin}/satis/musteriler`;
@@ -331,7 +422,7 @@
 	}
 
 	// ─── Inbox (okunmamış sayısı + okundu işareti) ────────────────────────────
-	let inboxMessages = $state<any[]>([]);
+	let inboxMessages = $state<Message[]>([]);
 
 	$effect(() => {
 		const uid = authStore.userId;
@@ -343,11 +434,11 @@
 	});
 
 	const unreadCount = $derived(
-		inboxMessages.filter((m: any) => !m.readAt).length
+		inboxMessages.filter((m: Message) => !m.readAt).length
 	);
 
 	const unreadByUser = $derived(
-		inboxMessages.reduce<Record<string, number>>((acc, m: any) => {
+		inboxMessages.reduce<Record<string, number>>((acc, m: Message) => {
 			if (!m.readAt) acc[m.senderId] = (acc[m.senderId] ?? 0) + 1;
 			return acc;
 		}, {})
@@ -357,10 +448,10 @@
 	$effect(() => {
 		if (!selectedChat?.userId) return;
 		const unread = inboxMessages.filter(
-			(m: any) => m.senderId === selectedChat.userId && !m.readAt
+			(m: Message) => m.senderId === selectedChat!.userId && !m.readAt
 		);
 		if (!unread.length) return;
-		db.transact(unread.map((m: any) => tx.messages[m.id].update({ readAt: Date.now() })));
+		db.transact(unread.map((m: Message) => tx.messages[m.id].update({ readAt: Date.now() })));
 	});
 
 	// Layout'tan toast tıklamasıyla sohbet aç (chatBridge)
@@ -388,41 +479,44 @@
 		});
 	});
 
-	// ─── Bildirimler (Pulse sekmesi için) ────────────────────────────────────
-	let myNotifications      = $state<any[]>([]);
-	let notificationsLoading = $state(true);
-
-	$effect(() => {
-		const uid = authStore.userId;
-		if (!uid) return;
-		return db.subscribeQuery(
-			{ notifications: { $: { where: { userId: uid }, order: { createdAt: 'desc' }, limit: 30 } } },
-			(res) => { untrack(() => { myNotifications = res.data?.notifications ?? []; notificationsLoading = false; }); }
-		);
-	});
-
-	// Pulse açılınca bildirimleri okundu yap
-	$effect(() => {
-		if (activeTab !== 'pulse') return;
-		const unread = myNotifications.filter((n: any) => !n.readAt);
-		if (!unread.length) return;
-		db.transact(unread.map((n: any) => tx.notifications[n.id].update({ readAt: Date.now() })));
-	});
-
 	// ─── Derived ─────────────────────────────────────────────────────────────
-	const customersById = $derived(Object.fromEntries(formCustomers.map((c) => [c.id, c.name])));
+	const customersById    = $derived(Object.fromEntries(formCustomers.map((c) => [c.id, c.name])));
+	const profileByUserId  = $derived(Object.fromEntries(allProfiles.map((p) => [p.userId, p])));
 
-	const activeDayTasks = $derived(
-		tasks.filter((t) => {
+	const receivedDayTasks = $derived.by(() => {
+		const uid = authStore.userId;
+		return tasks.filter((t) => {
+			if (t.assignedTo !== uid || t.createdBy === uid) return false;
 			if (!t.dueAt) return true;
 			return toLocalDateStr(new Date(t.dueAt)) === activeDay;
-		})
+		});
+	});
+
+	const sentDayTasks = $derived.by(() => {
+		const uid = authStore.userId;
+		return tasks.filter((t) => {
+			if (t.createdBy !== uid || t.assignedTo === uid) return false;
+			if (!t.dueAt) return true;
+			return toLocalDateStr(new Date(t.dueAt)) === activeDay;
+		});
+	});
+
+	const currentTabTasks = $derived(
+		taskSubTab === 'sent' ? sentDayTasks : receivedDayTasks
 	);
 
-	const activePendingCount = $derived(tasks.filter((t) => t.status === 'pending').length);
+	const activePendingCount = $derived.by(() => {
+		const uid = authStore.userId;
+		return tasks.filter((t) => t.status === 'pending' && t.assignedTo === uid).length;
+	});
 
 	const quoteTrackingTasks = $derived(
-		tasks.filter((t) => t.orderId && t.status !== 'done' && t.status !== 'dismissed')
+		tasks.filter((t) =>
+			t.orderId &&
+			t.status !== 'done' &&
+			t.status !== 'dismissed' &&
+			(!t.dueAt || t.dueAt <= Date.now())
+		)
 	);
 
 	const pendingQuoteCount = $derived(quoteTrackingTasks.length);
@@ -451,8 +545,6 @@
 		const now = Date.now();
 		db.transact(toClose.map((t) => tx.tasks[t.id].update({ status: 'done', completedAt: now })));
 	});
-
-	const teklifler = $derived(Object.values(ordersMap) as any[]);
 
 	// Counts tasks that have a dueAt on each day of the week strip
 	const taskCountByDay = $derived(
@@ -487,7 +579,7 @@
 			>
 				Mesajlar
 				{#if unreadCount > 0}
-					<span class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-red-500 flex items-center justify-center text-[8px] font-bold text-white px-0.5">{unreadCount > 9 ? '9+' : unreadCount}</span>
+					<span class="absolute -top-0.5 -right-0.5 min-w-3.5 h-3.5 rounded-full bg-red-500 flex items-center justify-center text-[8px] font-bold text-white px-0.5">{unreadCount > 9 ? '9+' : unreadCount}</span>
 				{/if}
 			</button>
 			<button
@@ -500,11 +592,13 @@
 			</button>
 		</div>
 
-		<!-- Avatar -->
+		<!-- Avatar / Settings toggle -->
 		<button
 			type="button"
-			aria-label="Profil"
-			class="w-8 h-8 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-[#666] hover:text-white transition-colors"
+			aria-label="Ayarlar"
+			onclick={() => (showSettings = !showSettings)}
+			class="w-8 h-8 rounded-full border flex items-center justify-center transition-colors
+				{showSettings ? 'bg-white border-white text-black' : 'bg-[#222] border-[#2a2a2a] text-[#666] hover:text-white'}"
 		>
 			<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 				<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -515,8 +609,70 @@
 	<!-- ═══ PANEL BODY ════════════════════════════════════════════════════════ -->
 	<div class="flex-1 overflow-y-auto px-4 pb-4" style="scrollbar-width: none;">
 
+		<!-- ── SETTINGS ─────────────────────────────────────────────────────── -->
+		{#if showSettings}
+			<div class="mb-6">
+				<h3 class="text-base font-bold text-white">Settings</h3>
+				<p class="text-xs text-[#555]">Manage your app</p>
+			</div>
+
+			<!-- Theme -->
+			<div class="mb-5">
+				<p class="text-[10px] font-semibold text-[#444] uppercase tracking-wider mb-2">Change app theme</p>
+				<div class="flex gap-0.5 bg-[#1a1a1a] rounded-full p-0.5">
+					<button
+						type="button"
+						onclick={() => setTheme('dark')}
+						class="flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
+							{theme === 'dark' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+					>Dark Theme</button>
+					<button
+						type="button"
+						onclick={() => setTheme('light')}
+						class="flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
+							{theme === 'light' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+					>Light Theme</button>
+				</div>
+			</div>
+
+			<!-- Language -->
+			<div class="mb-5">
+				<p class="text-[10px] font-semibold text-[#444] uppercase tracking-wider mb-2">Change app language</p>
+				<div class="flex gap-0.5 bg-[#1a1a1a] rounded-full p-0.5">
+					<button
+						type="button"
+						onclick={() => setLang('en')}
+						class="flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
+							{lang === 'en' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+					>English</button>
+					<button
+						type="button"
+						onclick={() => setLang('tr')}
+						class="flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
+							{lang === 'tr' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+					>Türkçe</button>
+				</div>
+			</div>
+
+			<!-- Leave -->
+			<div class="mb-5">
+				<p class="text-[10px] font-semibold text-[#444] uppercase tracking-wider mb-2">Leave the app</p>
+				<div class="flex gap-2">
+					<button
+						type="button"
+						onclick={signOut}
+						class="flex-1 py-2 rounded-full text-xs font-medium bg-[#1a1a1a] border border-[#2a2a2a] text-[#888] hover:bg-[#222] hover:text-white transition-colors"
+					>Logout</button>
+					<button
+						type="button"
+						onclick={signOut}
+						class="flex-1 py-2 rounded-full text-xs font-medium bg-[#1a1a1a] border border-[#2a2a2a] text-[#888] hover:bg-[#222] hover:text-white transition-colors"
+					>Change User</button>
+				</div>
+			</div>
+
 		<!-- ── TASKS ────────────────────────────────────────────────────────── -->
-		{#if activeTab === 'tasks'}
+		{:else if activeTab === 'tasks'}
 
 			<!-- Header -->
 			<div class="mb-4">
@@ -612,7 +768,7 @@
 					<Select
 						label="Atanacak Personel"
 						bind:value={newTask.assignedTo}
-						options={allProfiles.map((p) => ({ value: p.userId, label: p.fullName ?? p.email ?? p.userId }))}
+						options={allProfiles.map((p) => ({ value: p.userId ?? p.id, label: p.fullName ?? p.email ?? 'Personel' }))}
 						placeholder="Bana ata (varsayılan)"
 					/>
 					{#if formError}<p class="text-xs text-red-400">{formError}</p>{/if}
@@ -644,7 +800,7 @@
 						</div>
 					{:else}
 						{#each sortedQuoteTrackingTasks as task (task.id)}
-							{@const q       = ordersMap[task.orderId]}
+							{@const q       = ordersMap[task.orderId!]}
 							{@const days    = daysSince(task.createdAt)}
 							{@const overdue = days >= 7}
 							<div class="rounded-2xl border px-3 py-3 bg-[#1a1a1a] transition-colors
@@ -668,7 +824,7 @@
 								<div class="flex items-center justify-between mt-2">
 									<span class="text-[10px] text-[#444]">{fmtShortDate(task.createdAt)}</span>
 									{#if q?.totalWithVat}
-										<span class="text-xs font-medium text-[#777]">{fmtMoney(q.totalWithVat, q.currency)}</span>
+										<span class="text-xs font-medium text-[#777]">{fmtMoney(q.totalWithVat, q.currency ?? '')}</span>
 									{/if}
 								</div>
 							</div>
@@ -680,10 +836,10 @@
 			{:else}
 				<div class="flex flex-col gap-2">
 					{#if tasksLoading}
-						{#each [1, 2, 3] as _, i (i)}
+						{#each [1, 2, 3] as _k (_k)}
 							<div class="h-14 rounded-2xl bg-[#1a1a1a] animate-pulse"></div>
 						{/each}
-					{:else if activeDayTasks.length === 0}
+					{:else if currentTabTasks.length === 0}
 						<div class="flex flex-col items-center gap-2 py-8 text-[#444]">
 							<svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 								<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
@@ -691,7 +847,7 @@
 							<p class="text-xs">Bu gün için görev yok</p>
 						</div>
 					{:else}
-						{#each activeDayTasks as task (task.id)}
+						{#each currentTabTasks as task (task.id)}
 							{@const st         = taskStatus(task)}
 							{@const isDone     = st === 'done'}
 							{@const isExpanded = expandedId === task.id}
@@ -751,20 +907,25 @@
 											<span class="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-medium bg-orange-950/70 text-orange-300 border border-orange-800/40">
 												Teklif Takibi
 											</span>
-											{@const q = ordersMap[task.orderId]}
+											{@const q = ordersMap[task.orderId!]}
 											{#if q}
 												<p class="text-[10px] text-[#555] mt-0.5 leading-tight">
 													{q.customer?.name ?? ''}
-													{#if q.totalWithVat}· {fmtMoney(q.totalWithVat, q.currency)}{/if}
+													{#if q.totalWithVat}· {fmtMoney(q.totalWithVat, q.currency ?? '')}{/if}
 												</p>
 											{/if}
 										{/if}
 
 										<!-- Expanded section -->
 										{#if isExpanded}
-											{#if task.relatedEntityType === 'customer' && customersById[task.relatedEntityId]}
+											{#if task.relatedEntityType === 'customer' && customersById[task.relatedEntityId!]}
 												<p class="text-xs text-[#444] mt-2">
-													İlgili müşteri: <span class="text-[#666]">{customersById[task.relatedEntityId]}</span>
+													İlgili müşteri: <span class="text-[#666]">{customersById[task.relatedEntityId!]}</span>
+												</p>
+											{/if}
+											{#if profileByUserId[task.assignedTo!]?.fullName}
+												<p class="text-xs text-[#444] mt-2">
+													Atanan: <span class="text-[#666]">{profileByUserId[task.assignedTo!].fullName}</span>
 												</p>
 											{/if}
 
@@ -796,23 +957,25 @@
 															type="button"
 															aria-label="Teklif linkini kopyala"
 															title="Teklif linkini kopyala"
-															onclick={() => teklifLinkiKopyala(task.orderId)}
+															onclick={() => teklifLinkiKopyala(task.orderId!)}
 															class="w-6 h-6 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-[#555] hover:text-white transition-colors"
 														>
 															<Share2 size={11} />
 														</button>
 													{/if}
 
-													<!-- Complete -->
-													<button
-														type="button"
-														onclick={() => completeTask(task.id)}
-														disabled={completing === task.id}
-														style={completing === task.id ? 'pointer-events: none' : ''}
-														class="ml-auto px-3 py-1 rounded-full bg-white text-black text-[10px] font-semibold hover:bg-[#e8e8e8] transition-colors disabled:opacity-50"
-													>
-														{completing === task.id ? '…' : 'Tamamla'}
-													</button>
+													<!-- Complete (only for the assigned user, not the sender) -->
+													{#if task.assignedTo === authStore.userId && task.createdBy !== authStore.userId}
+														<button
+															type="button"
+															onclick={() => completeTask(task)}
+															disabled={completing === task.id}
+															style={completing === task.id ? 'pointer-events: none' : ''}
+															class="ml-auto px-3 py-1 rounded-full bg-white text-black text-[10px] font-semibold hover:bg-[#e8e8e8] transition-colors disabled:opacity-50"
+														>
+															{completing === task.id ? '…' : 'Tamamla'}
+														</button>
+													{/if}
 												</div>
 											{/if}
 										{/if}
@@ -830,7 +993,7 @@
 					{#if takipGorevleri.length > 0}
 						<div class="mt-4">
 							{#each takipGorevleri as gorev (gorev.id)}
-								{@const q = ordersMap[gorev.orderId]}
+								{@const q = ordersMap[gorev.orderId!]}
 								<div class="flex items-center justify-between rounded-lg border border-orange-900/40 bg-[#1a1a1a] px-4 py-3 mb-2">
 									<div class="min-w-0 flex-1">
 										<p class="text-sm font-medium text-white truncate">{gorev.title}</p>
@@ -839,7 +1002,7 @@
 									<div class="shrink-0 ml-3 flex flex-col items-end gap-1">
 										<span class="text-[9px] font-bold text-orange-400 uppercase">Vadesi Geçti</span>
 										{#if q?.totalWithVat}
-											<span class="text-xs text-[#888]">{fmtMoney(q.totalWithVat, q.currency)}</span>
+											<span class="text-xs text-[#888]">{fmtMoney(q.totalWithVat, q.currency ?? '')}</span>
 										{/if}
 									</div>
 								</div>
@@ -863,12 +1026,12 @@
 						<ChevronLeft size={14} />
 					</button>
 					<div class="w-8 h-8 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-xs font-bold text-white shrink-0">
-						{initials(selectedChat.profile)}
+						{initials(selectedChat?.profile)}
 					</div>
 					<div class="min-w-0">
-						<p class="text-sm font-semibold text-white leading-tight truncate">{displayName(selectedChat.profile)}</p>
-						{#if selectedChat.profile.email}
-							<p class="text-[10px] text-[#444] truncate">{selectedChat.profile.email}</p>
+						<p class="text-sm font-semibold text-white leading-tight truncate">{displayName(selectedChat?.profile)}</p>
+						{#if selectedChat?.profile?.email}
+							<p class="text-[10px] text-[#444] truncate">{selectedChat?.profile?.email}</p>
 						{/if}
 					</div>
 				</div>
@@ -876,11 +1039,11 @@
 				<!-- Messages area -->
 				<div
 					bind:this={chatScrollEl}
-					class="h-[280px] overflow-y-auto flex flex-col gap-2 mb-3 pr-0.5"
+					class="h-70 overflow-y-auto flex flex-col gap-2 mb-3 pr-0.5"
 					style="scrollbar-width: thin; scrollbar-color: #2a2a2a transparent;"
 				>
 					{#if messagesLoading}
-						{#each [1, 2, 3] as _, i (i)}
+						{#each [1, 2, 3] as _k, i (_k)}
 							<div class="h-8 rounded-2xl bg-[#1a1a1a] animate-pulse {i % 2 === 0 ? 'w-2/3 self-end' : 'w-1/2 self-start'}"></div>
 						{/each}
 					{:else if messages.length === 0}
@@ -897,7 +1060,7 @@
 								<div class="max-w-[78%] px-3 py-2 rounded-2xl {isMe
 									? 'bg-white text-black rounded-br-md'
 									: 'bg-[#1e1e1e] text-white border border-[#252525] rounded-bl-md'}">
-									<p class="text-xs leading-relaxed break-words">{msg.content}</p>
+									<p class="text-xs leading-relaxed wrap-break-word">{msg.content}</p>
 									<p class="text-[9px] mt-0.5 {isMe ? 'text-black/40' : 'text-[#444]'} text-right flex items-center justify-end gap-0.5">
 										<span>{fmtMsgTime(msg.createdAt)}</span>
 										{#if isMe}
@@ -944,7 +1107,7 @@
 				</div>
 
 				{#if profilesLoading}
-					{#each [1, 2, 3] as _, i (i)}
+					{#each [1, 2, 3] as _k (_k)}
 						<div class="h-14 rounded-2xl bg-[#1a1a1a] animate-pulse mb-2"></div>
 					{/each}
 				{:else if filteredProfiles.length === 0}
@@ -961,7 +1124,7 @@
 						{#each filteredProfiles as profile (profile.id)}
 							<button
 								type="button"
-								onclick={() => (selectedChat = { userId: profile.userId, profile })}
+								onclick={() => (selectedChat = { userId: profile.userId!, profile })}
 								class="flex items-center gap-3 w-full rounded-2xl bg-[#1a1a1a] border border-[#222] px-3 py-3 text-left transition-colors hover:bg-[#202020] hover:border-[#2a2a2a]"
 							>
 								<div class="w-9 h-9 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-sm font-bold text-white shrink-0">
@@ -973,9 +1136,9 @@
 										<p class="text-xs text-[#555] truncate">{profile.email}</p>
 									{/if}
 								</div>
-								{#if (unreadByUser[profile.userId] ?? 0) > 0}
-									<span class="min-w-[18px] h-[18px] rounded-full bg-red-500 flex items-center justify-center text-[9px] font-bold text-white px-1 shrink-0">
-										{unreadByUser[profile.userId] > 9 ? '9+' : unreadByUser[profile.userId]}
+								{#if (unreadByUser[profile.userId!] ?? 0) > 0}
+									<span class="min-w-4.5 h-4.5 rounded-full bg-red-500 flex items-center justify-center text-[9px] font-bold text-white px-1 shrink-0">
+										{unreadByUser[profile.userId!] > 9 ? '9+' : unreadByUser[profile.userId!]}
 									</span>
 								{:else}
 									<svg class="w-3.5 h-3.5 text-[#333] shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -995,39 +1158,10 @@
 				<p class="text-xs text-[#555]">{activities.length} aktivite</p>
 			</div>
 
-			<!-- Bildirimler -->
-			{#if !notificationsLoading && myNotifications.length > 0}
-				<div class="mb-5">
-					<p class="text-[10px] font-semibold text-[#444] uppercase tracking-wider mb-2">Bildirimler</p>
-					<div class="flex flex-col gap-1.5">
-						{#each myNotifications as notif (notif.id)}
-							{@const isUnread = !notif.readAt}
-							<div class="rounded-2xl border px-3 py-2.5 flex items-start gap-2.5
-								{isUnread ? 'bg-[#1a1610] border-[#2d2510]' : 'bg-[#141414] border-[#1e1e1e]'}">
-								<div class="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 mt-0.5
-									{isUnread ? 'bg-blue-900/50 text-blue-300' : 'bg-[#1e1e1e] text-[#555]'}">
-									{(notif.actorName ?? notif.title ?? '?')[0]?.toUpperCase() ?? '?'}
-								</div>
-								<div class="flex-1 min-w-0">
-									<p class="text-xs leading-tight {isUnread ? 'text-white' : 'text-[#777]'}">
-										<span class="font-semibold">{notif.title}</span>
-									</p>
-									<p class="text-[10px] text-[#555] truncate mt-0.5">{notif.body}</p>
-									<p class="text-[10px] text-[#3a3a3a] mt-0.5">{relTime(notif.createdAt)}</p>
-								</div>
-								{#if isUnread}
-									<div class="w-1.5 h-1.5 rounded-full bg-blue-500 shrink-0 mt-1.5"></div>
-								{/if}
-							</div>
-						{/each}
-					</div>
-				</div>
-			{/if}
-
 			<!-- Aktivite akışı -->
 			<div class="flex flex-col gap-2">
 				{#if activitiesLoading}
-					{#each [1, 2, 3] as _, i (i)}
+					{#each [1, 2, 3] as _k (_k)}
 						<div class="h-16 rounded-2xl bg-[#1a1a1a] animate-pulse"></div>
 					{/each}
 				{:else if activities.length === 0}
@@ -1048,9 +1182,9 @@
 									<span class="font-semibold">{act.actorName ?? '—'}</span>
 									<span class="text-[#888]">
 										{#if act.description}
-											&#32;{act.description}
+											 {act.description}
 										{:else}
-											&#32;{activityLabel(act.type)}
+											 {activityLabel(act.type)}
 										{/if}
 									</span>
 								</p>
