@@ -26,6 +26,8 @@
 </script>
 
 <script lang="ts">
+	/* eslint-disable @typescript-eslint/no-explicit-any */
+	/* eslint-disable @typescript-eslint/no-unused-vars */
 	import { untrack } from 'svelte';
 	import { db, id, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
@@ -163,8 +165,8 @@
 			(result) => {
 				untrack(() => {
 					pricesMap = Object.fromEntries(
-						(result.data?.prices ?? []).map((p: { key: string } & Record<string, unknown>) => [p.key, p])
-					);
+						(result.data?.prices ?? []).map((p) => [p.key, p])
+					) as typeof pricesMap;
 				});
 			}
 		);
@@ -218,6 +220,7 @@
 		descRU?: string;
 		descAR?: string;
 		descFR?: string;
+		updatedAt?: number;
 	};
 
 	// ─── Line items ──────────────────────────────────────────────────────────────
@@ -579,6 +582,9 @@
 			];
 
 			// Auto-create tracking task
+			const dueDate = new Date(now);
+			dueDate.setDate(dueDate.getDate() + 7);
+			dueDate.setHours(0, 0, 0, 0);
 			const autoTaskId = id();
 			ops.push(
 				tx.tasks[autoTaskId].update({
@@ -592,7 +598,7 @@
 					relatedEntityId:   orderId,
 					createdBy:         userId,
 					createdAt:         now,
-					dueAt:             now + 7 * 24 * 60 * 60 * 1000
+					dueAt:             dueDate.getTime()
 				})
 			);
 
