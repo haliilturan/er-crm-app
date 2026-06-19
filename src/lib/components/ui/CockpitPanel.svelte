@@ -486,6 +486,16 @@
 	const receivedDayTasks = $derived.by(() => {
 		const uid = authStore.userId;
 		return tasks.filter((t) => {
+			if (t.status === 'done' || t.status === 'dismissed') return false;
+
+			// Teklif takibi görevi: o güne denk geliyorsa göster (kendine atanmış olsa bile)
+			if (t.orderId) {
+				if (t.assignedTo !== uid) return false;
+				if (!t.dueAt) return false;
+				return toLocalDateStr(new Date(t.dueAt)) === activeDay;
+			}
+
+			// Normal görev: başkasından atanmış olmalı
 			if (t.assignedTo !== uid || t.createdBy === uid) return false;
 			if (!t.dueAt) return true;
 			return toLocalDateStr(new Date(t.dueAt)) === activeDay;
