@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { SvelteSet } from 'svelte/reactivity';
 	import { db, id, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { SectionHead, Badge } from '$lib/components/ui';
@@ -35,7 +36,7 @@
 	let editUser        = $state<UserRow | null>(null);
 	let editDepartment  = $state('');
 	let editRole        = $state('member');
-	let editCompanyIds  = $state<Set<string>>(new Set());
+	let editCompanyIds  = new SvelteSet<string>();
 	let saving          = $state(false);
 	let saveError       = $state('');
 
@@ -46,7 +47,7 @@
 	let addPhone       = $state('');
 	let addDepartment  = $state('');
 	let addRole        = $state('member');
-	let addCompanyIds  = $state<Set<string>>(new Set());
+	let addCompanyIds  = new SvelteSet<string>();
 	let addSaving      = $state(false);
 	let addError       = $state('');
 
@@ -126,9 +127,9 @@
 		editUser       = user;
 		editDepartment = user.department ?? '';
 		editRole       = highestRole(memberships) || 'member';
-		editCompanyIds = new Set(
-			memberships.map((m) => m.company?.id).filter((x): x is string => !!x)
-		);
+		editCompanyIds.clear();
+		memberships.map((m) => m.company?.id).filter((x): x is string => !!x)
+			.forEach((cid) => editCompanyIds.add(cid));
 		saveError = '';
 	}
 
@@ -137,9 +138,8 @@
 	}
 
 	function toggleCompany(compId: string) {
-		const next = new Set(editCompanyIds);
-		if (next.has(compId)) next.delete(compId); else next.add(compId);
-		editCompanyIds = next;
+		if (editCompanyIds.has(compId)) editCompanyIds.delete(compId);
+		else editCompanyIds.add(compId);
 	}
 
 	function openAdd() {
@@ -148,7 +148,7 @@
 		addPhone      = '';
 		addDepartment = '';
 		addRole       = 'member';
-		addCompanyIds = new Set();
+		addCompanyIds.clear();
 		addError      = '';
 		addModalOpen  = true;
 	}
@@ -156,9 +156,8 @@
 	function closeAdd() { addModalOpen = false; }
 
 	function toggleAddCompany(compId: string) {
-		const next = new Set(addCompanyIds);
-		if (next.has(compId)) next.delete(compId); else next.add(compId);
-		addCompanyIds = next;
+		if (addCompanyIds.has(compId)) addCompanyIds.delete(compId);
+		else addCompanyIds.add(compId);
 	}
 
 	async function addUser() {
@@ -173,6 +172,7 @@
 		try {
 			const now       = Date.now();
 			const profileId = id();
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const ops: any[] = [];
 
 			ops.push(
@@ -185,20 +185,30 @@
 				})
 			);
 
+			// Try to find an existing auth-linked profile for this email so
+			// userCompanies.userId is populated immediately rather than waiting
+			// for the user's first login.
+			const existingProfile = await db.queryOnce({
+				userProfiles: { $: { where: { email: addEmail.trim().toLowerCase() } } }
+			});
+			const realUserId = (existingProfile.data?.userProfiles ?? [])[0]?.userId ?? '';
+
 			for (const compId of addCompanyIds) {
 				const ucId = id();
 				ops.push(
 					(tx.userCompanies[ucId]
 						.update({
-							userId:    '',
+							userId:    realUserId, // userId will be backfilled by ensureProfile on first login
 							companyId: compId,
 							role:      addRole,
 							joinedAt:  now,
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
 						}) as any)
 						.link({ profile: profileId, company: compId })
 				);
 			}
 
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			await db.transact(ops as any);
 			closeAdd();
 		} catch (err) {
@@ -243,13 +253,15 @@
 								companyId: compId,
 								role:      editRole,
 								joinedAt:  now
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
 							}) as any)
 							.link({ profile: editUser.id, company: compId })
 					);
 				} else {
 					const mem = existingMap.get(compId)!;
 					if (mem.role !== editRole) {
-						ops.push(tx.userCompanies[mem.id].update({ role: editRole }) as any);
+						// eslint-disable-next-line @typescript-eslint/no-explicit-any
+					ops.push(tx.userCompanies[mem.id].update({ role: editRole }) as any);
 					}
 				}
 			}
@@ -257,11 +269,27 @@
 			// 3. Kaldırılan şirket bağlantılarını sil
 			for (const [compId, mem] of existingMap) {
 				if (!editCompanyIds.has(compId)) {
+					// eslint-disable-next-line @typescript-eslint/no-explicit-any
 					ops.push((tx.userCompanies[mem.id] as any).delete());
 				}
 			}
 
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			await db.transact(ops as any);
+
+			if (editUser.userId) {
+				const ucResult = await db.queryOnce({
+					userCompanies: { $: { where: { profile: editUser.id } } }
+				});
+				const ucRecords = (ucResult.data?.userCompanies ?? []) as { id: string; userId?: string }[];
+				const ucOps = ucRecords
+					.filter((uc) => !uc.userId)
+					.map((uc) => tx.userCompanies[uc.id].update({ userId: editUser!.userId! }));
+				if (ucOps.length > 0) {
+					await db.transact(ucOps);
+				}
+			}
+
 			closeEdit();
 		} catch (err) {
 			saveError = err instanceof Error ? err.message : 'Bir hata oluştu.';
@@ -308,7 +336,7 @@
 
 			{:else}
 				<div class="flex flex-col gap-2 max-w-3xl">
-					{#each users as user (user.id)}
+					{#each users as user, i (user.id ?? `idx-${i}`)}
 						{@const memberships = user.companyMemberships ?? []}
 						{@const role = highestRole(memberships)}
 						{@const isActive = memberships.length > 0}
@@ -344,7 +372,7 @@
 									variant={isActive ? 'success' : 'default'}
 								/>
 
-								{#each memberships as mem (mem.id)}
+								{#each memberships as mem, mi (mem.id ?? `idx-${mi}`)}
 									{#if mem.company}
 										<span class="rounded bg-[#1e1e2e] px-2 py-0.5 text-[10px] text-[#888]">
 											{mem.company.name}
@@ -475,7 +503,7 @@
 					<div>
 						<p class="mb-1.5 text-xs text-[#777]">Şirketler <span class="text-[#ff4444]">*</span></p>
 						<div class="flex flex-col gap-2">
-							{#each activeCompanies as company (company.id)}
+							{#each activeCompanies as company, ci (company.id ?? `idx-${ci}`)}
 								<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-[#2a2a2a] px-4 py-2.5 transition hover:border-[#444]">
 									<input
 										type="checkbox"
@@ -594,7 +622,7 @@
 					<div>
 						<p class="mb-1.5 text-xs text-[#777]">Şirket Bağlantıları</p>
 						<div class="flex flex-col gap-2">
-							{#each activeCompanies as company (company.id)}
+							{#each activeCompanies as company, ci (company.id ?? `idx-${ci}`)}
 								<label class="flex cursor-pointer items-center gap-3 rounded-lg border border-[#2a2a2a] px-4 py-2.5 transition hover:border-[#444]">
 									<input
 										type="checkbox"
