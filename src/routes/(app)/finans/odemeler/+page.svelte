@@ -64,13 +64,13 @@
 	});
 
 	$effect(() => {
-		const cId = authStore.activeCompanyId;
-		if (!cId || cId === '') return;
+		const cIds = authStore.companyIds;
+		if (!cIds.length) return;
 		loading = true;
 		return db.subscribeQuery(
 			{
 				orders: {
-					$: { where: { companyId: cId }, order: { createdAt: 'desc' } },
+					$: { where: { companyId: { in: cIds } }, order: { createdAt: 'desc' } },
 					payments: {},
 					customer: {}
 				}

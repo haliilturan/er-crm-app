@@ -33,6 +33,7 @@
 		updatedBy?: string;
 		updatedAt?: number;
 		createdAt?: number;
+		createdBy?: string;
 	};
 
 	// ── State ────────────────────────────────────────────────────────────────
@@ -100,7 +101,7 @@
 			{ customers: { $: { order: { createdAt: 'desc' } } } },
 			(res) => {
 				untrack(() => {
-					if (res.isLoading) return;
+					if (!res.data) return;
 					rawCustomers = (res.data?.customers ?? []) as RawCustomer[];
 					loading = false;
 				});
@@ -272,7 +273,7 @@
 	>
 		{#if loading && activeMode === 'latest'}
 			<!-- Initial load skeleton (only blocks Mode 1; Mode 2 starts empty anyway) -->
-			{#each [1, 2, 3] as _, i (i)}
+			{#each [1, 2, 3] as _k (_k)}
 				<div class="animate-pulse h-16 rounded-2xl bg-[#1a1a1a]"></div>
 			{/each}
 
@@ -285,7 +286,7 @@
 
 		{:else if isDebouncing}
 			<!-- Debounce in-flight: show skeleton so it doesn't feel frozen -->
-			{#each [1, 2, 3] as _, i (i)}
+			{#each [1, 2, 3] as _k (_k)}
 				<div class="animate-pulse h-16 rounded-2xl bg-[#1a1a1a]"></div>
 			{/each}
 

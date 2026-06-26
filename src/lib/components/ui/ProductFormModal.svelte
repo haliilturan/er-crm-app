@@ -10,6 +10,9 @@
 		sku: string;
 		brandName: string;
 		category: string;
+		detail?: string;
+		code?: string;
+		serialNo?: string;
 	};
 
 	export type EditableProduct = {
@@ -91,16 +94,16 @@
 		draftMode?: boolean;
 	} = $props();
 
-	let brands = $state<{ id: string; name: string }[]>([]);
+	let brands        = $state<{ id: string; name: string }[]>([]);
+	let brandsLoading = $state(true);
 
 	$effect(() => {
-		const cId = companyId;
-		if (!cId) return;
 		return db.subscribeQuery(
-			{ brands: { $: { where: { companyId: cId }, order: { name: 'asc' } } } },
+			{ brands: { $: { order: { name: 'asc' } } } },
 			(res) => {
 				untrack(() => {
-					brands = (res.data?.brands ?? []) as { id: string; name: string }[];
+					brands        = (res.data?.brands ?? []) as { id: string; name: string }[];
+					brandsLoading = false;
 				});
 			}
 		);
@@ -762,6 +765,7 @@
 			<!-- Marka + Kategori -->
 			<div class="grid grid-cols-2 gap-3">
 				<div class="flex flex-col gap-1">
+					<!-- svelte-ignore a11y_label_has_associated_control -->
 					<label class="text-xs text-gray-500">Marka</label>
 					{#if quoteMode && quoteSourceProduct}
 						<p class="rounded-lg border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-gray-400">
@@ -774,10 +778,14 @@
 								text-white focus:border-[#555] focus:outline-none
 								[&>option]:bg-[#1a1a1a] [&>option]:text-white"
 						>
-							<option value="">Seçiniz...</option>
-							{#each brands as b (b.id)}
-								<option value={b.name}>{b.name}</option>
-							{/each}
+							{#if brandsLoading}
+								<option value="" disabled>Yükleniyor...</option>
+							{:else}
+								<option value="">Seçiniz...</option>
+								{#each brands as b (b.id)}
+									<option value={b.name}>{b.name}</option>
+								{/each}
+							{/if}
 						</select>
 					{/if}
 				</div>

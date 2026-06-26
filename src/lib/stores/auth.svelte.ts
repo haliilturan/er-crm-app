@@ -8,11 +8,19 @@ export interface CompanyInfo {
 	role: string;
 }
 
+interface UserProfile {
+	id: string;
+	email?: string;
+	fullName?: string;
+	userId?: string;
+	department?: string;
+	createdAt?: number;
+}
+
 let _userId     = $state<string | null>(null);
 let _userEmail  = $state<string | null>(null);
 let _ready      = $state(false);
 let _companies  = $state<CompanyInfo[]>([]);
-let _filter     = $state<string | 'all'>('all');
 let _department = $state<string | null>(null);
 
 let _unsubAuth:      (() => void) | null = null;
@@ -24,7 +32,26 @@ async function ensureProfile(uid: string, email: string): Promise<void> {
 		const result = await db.queryOnce({
 			userProfiles: { $: { where: { email } } }
 		});
-		if ((result.data?.userProfiles ?? []).length > 0) return;
+		const existing = (result.data?.userProfiles ?? [])[0];
+		if (existing) {
+			if (!existing.userId) {
+				await db.transact([
+					tx.userProfiles[existing.id].update({ userId: uid })
+				]);
+			}
+			// Backfill userCompanies records that have empty userId
+			const ucResult = await db.queryOnce({
+				userCompanies: { $: { where: { profile: existing.id } } }
+			});
+			const ucRecords = (ucResult.data?.userCompanies ?? []) as { id: string; userId?: string }[];
+			const ucOps = ucRecords
+				.filter(uc => !uc.userId)
+				.map(uc => tx.userCompanies[uc.id].update({ userId: uid }));
+			if (ucOps.length > 0) {
+				await db.transact(ucOps);
+			}
+			return;
+		}
 
 		const profileId = id();
 		await db.transact([
@@ -48,15 +75,13 @@ export const authStore = {
 	get ready():     boolean        { return _ready; },
 	get companies(): CompanyInfo[]  { return _companies; },
 	get companyIds(): string[]      { return _companies.map((c) => c.id); },
-	get activeFilter(): string | 'all' { return _filter; },
 	get isAdmin():         boolean         { return _companies.some((c) => c.role === 'admin'); },
 	get isFinans():        boolean         { return _companies.some((c) => c.role === 'finans' || c.role === 'admin'); },
 	get department():      string | null   { return _department; },
 	get isFinansOrAdmin(): boolean         { return this.isAdmin || _department === 'finance'; },
 
-	/** Sorgu yazarken kullanılacak şirket ID'si (filtre seçiliyse o, yoksa ilk) */
+	/** Sorgu yazarken kullanılacak şirket ID'si */
 	get activeCompanyId(): string | null {
-		if (_filter !== 'all') return _filter;
 		return _companies[0]?.id ?? null;
 	},
 
@@ -85,7 +110,7 @@ export const authStore = {
 			_unsubProfile = db.subscribeQuery(
 				{ userProfiles: { $: { where: { email: email! } } } },
 				(result) => {
-					const profile = (result.data?.userProfiles ?? [])[0] as any;
+					const profile = (result.data?.userProfiles ?? [])[0] as UserProfile;
 					_department = profile?.department ?? null;
 				}
 			);
@@ -114,10 +139,6 @@ export const authStore = {
 		});
 	},
 
-	setFilter(id: string | 'all'): void {
-		_filter = id;
-	},
-
 	destroy(): void {
 		_unsubAuth?.();
 		_unsubCompanies?.();
@@ -129,7 +150,6 @@ export const authStore = {
 		_userEmail  = null;
 		_ready      = false;
 		_companies  = [];
-		_filter     = 'all';
 		_department = null;
 	}
 };

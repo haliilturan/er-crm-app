@@ -1,4 +1,5 @@
 <script lang="ts">
+	/* eslint-disable @typescript-eslint/no-explicit-any */
 	import { onMount, untrack } from 'svelte';
 	import { SvelteSet } from 'svelte/reactivity';
 	import type { Snippet } from 'svelte';
@@ -11,8 +12,6 @@
 	import CockpitPanel from '$lib/components/ui/CockpitPanel.svelte';
 
 	let { children }: { children: Snippet } = $props();
-
-	let filterOpen = $state(false);
 
 	onMount(() => {
 		authStore.init();
@@ -118,14 +117,19 @@
 	);
 
 	async function navigateToModule(mod: AppModule) {
+		// @ts-expect-error — SvelteKit typed routes string parametresini kabul etmiyor
 		await goto(resolve(mod.subPages[0]?.href ?? mod.href));
 	}
+
+	// eslint-disable-next-line @typescript-eslint/no-explicit-any
+	const navHref = (path: string): any => resolve(path as any);
 
 	function initial(name: string): string {
 		return name.trim()[0]?.toUpperCase() ?? '?';
 	}
 
 	function signOut() {
+		// eslint-disable-next-line svelte/no-navigation-without-resolve
 		goto('/login');
 		db.auth.signOut();
 		authStore.destroy();
@@ -211,16 +215,6 @@
 		);
 	});
 
-	let activeFilterLabel = $derived(
-		authStore.activeFilter === 'all'
-			? 'Tümü'
-			: (authStore.companies.find((c) => c.id === authStore.activeFilter)?.name ?? 'Şirket')
-	);
-	let activeFilterInitial = $derived(
-		authStore.activeFilter === 'all'
-			? '∞'
-			: initial(authStore.companies.find((c) => c.id === authStore.activeFilter)?.name ?? '?')
-	);
 </script>
 
 <!-- ─── Loading ────────────────────────────────────────────────────────────────── -->
@@ -280,57 +274,6 @@
 					{/if}
 				</button>
 
-				<!-- Company filter -->
-				<div class="relative">
-					<button
-						onclick={() => (filterOpen = !filterOpen)}
-						class="flex h-8 items-center gap-1.5 rounded-lg px-2 transition-colors
-							{filterOpen ? 'bg-[#222]' : 'hover:bg-[#1a1a1a]'}"
-					>
-						<div class="flex h-5 w-5 items-center justify-center rounded-md bg-[#333] text-[9px] font-bold text-white">
-							{activeFilterInitial}
-						</div>
-						<span class="max-w-24 truncate text-xs text-[#888]">{activeFilterLabel}</span>
-						<svg class="h-3 w-3 shrink-0 text-[#555] transition-transform {filterOpen ? 'rotate-180' : ''}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-							<path d="M6 9l6 6 6-6" />
-						</svg>
-					</button>
-
-					{#if filterOpen}
-						<div class="fixed inset-0 z-40" role="presentation" onclick={() => (filterOpen = false)}></div>
-						<div class="absolute right-0 top-full z-50 mt-1 w-52 overflow-hidden rounded-xl border border-[#2a2a2a] bg-[#111111] shadow-2xl">
-							<p class="border-b border-[#2a2a2a] px-4 py-2 text-[11px] font-semibold uppercase tracking-wider text-[#555]">
-								Şirket Filtresi
-							</p>
-							<div class="p-1.5">
-								<button
-									onclick={() => { authStore.setFilter('all'); filterOpen = false; }}
-									class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors
-										{authStore.activeFilter === 'all' ? 'bg-white text-black' : 'text-[#888] hover:bg-[#222] hover:text-white'}"
-								>
-									<div class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#333] text-[9px] font-bold text-white">∞</div>
-									<span class="flex-1 truncate text-left">Tümü</span>
-								</button>
-								{#each authStore.companies as company (company.id)}
-									<button
-										onclick={() => { authStore.setFilter(company.id); filterOpen = false; }}
-										class="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors
-											{authStore.activeFilter === company.id ? 'bg-white text-black' : 'text-[#888] hover:bg-[#222] hover:text-white'}"
-									>
-										<div class="flex h-5 w-5 shrink-0 items-center justify-center rounded-md bg-[#333] text-[9px] font-bold text-white">
-											{initial(company.name)}
-										</div>
-										<span class="flex-1 truncate text-left">{company.name}</span>
-									</button>
-								{/each}
-								{#if authStore.companies.length === 0}
-									<p class="px-3 py-2 text-xs text-[#555]">Şirket bulunamadı</p>
-								{/if}
-							</div>
-						</div>
-					{/if}
-				</div>
-
 				<!-- User avatar -->
 				<div
 					class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#2a2a2a] bg-[#222] text-xs font-medium text-[#888]"
@@ -366,7 +309,7 @@
 					<nav class="flex flex-col gap-0.5 px-2">
 						{#each activeModule.subPages as subPage (subPage.href)}
 							<a
-								href={resolve(subPage.href)}
+								href={navHref(subPage.href)}
 								class="flex items-center rounded-lg px-3 py-2 text-sm transition-colors
 									{page.url.pathname.startsWith(subPage.href)
 										? 'bg-[#222] text-white font-medium'

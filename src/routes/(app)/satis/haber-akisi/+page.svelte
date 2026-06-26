@@ -78,6 +78,13 @@
 	let modalOpen      = $state(false);
 	let modalOrder     = $state<OrderItem | null>(null);
 
+	// Pagination
+	const PAGE_SIZE = 10;
+	let currentPage = $state(1);
+
+	// Search debounce
+	let debouncedUserSearch = $state('');
+
 	function closeModal() {
 		modalOpen  = false;
 		modalOrder = null;
@@ -137,8 +144,8 @@
 	const visibleUsers = $derived(
 		userList
 			.filter(u => {
-				if (!userSearch.trim()) return true;
-				return (u.profile?.fullName ?? '').toLowerCase().includes(userSearch.toLowerCase());
+				if (!debouncedUserSearch) return true;
+				return (u.profile?.fullName ?? '').toLowerCase().includes(debouncedUserSearch.toLowerCase());
 			})
 			.sort((a, b) =>
 				(a.profile?.fullName ?? '').localeCompare(b.profile?.fullName ?? '', 'tr')
@@ -176,6 +183,9 @@
 		const sorted = items.sort((a, b) => b.createdAt - a.createdAt);
 		return [...new Map(sorted.map(i => [i.id, i])).values()];
 	})());
+
+	const totalPages     = $derived(Math.max(1, Math.ceil(feedItems.length / PAGE_SIZE)));
+	const pagedFeedItems = $derived(feedItems.slice((currentPage - 1) * PAGE_SIZE, currentPage * PAGE_SIZE));
 
 	// ── Subscription ──────────────────────────────────────────────────────────
 
@@ -220,6 +230,21 @@
 				});
 			}
 		);
+	});
+
+	// Debounce userSearch — min 3 karakter
+	$effect(() => {
+		const val = userSearch;
+		const t = setTimeout(() => {
+			debouncedUserSearch = val.length >= 3 ? val : '';
+		}, 300);
+		return () => clearTimeout(t);
+	});
+
+	// Filtre değişince sayfa 1'e dön
+	$effect(() => {
+		void feedItems;
+		untrack(() => { currentPage = 1; });
 	});
 
 	// ── Helpers ───────────────────────────────────────────────────────────────
@@ -338,13 +363,13 @@
 		<!-- Feed listesi -->
 		<div class="feed-list">
 			{#if loading}
-				{#each Array(5) as _k (_k)}
+				{#each Array.from({length: 5}, (_, i) => i) as i (i)}
 					<div class="skeleton"></div>
 				{/each}
 			{:else if feedItems.length === 0}
 				<div class="empty-state">Bu tarihte kayıt yok</div>
 			{:else}
-				{#each feedItems as item (item._kind + '-' + item.id)}
+				{#each pagedFeedItems as item (item._kind + '-' + item.id)}
 					{@const profile  = profileByUserId[item.createdBy]}
 					{@const name     = profile?.fullName ?? 'Personel'}
 
@@ -389,6 +414,23 @@
 
 					</div>
 				{/each}
+				{#if totalPages > 1}
+					<div class="pagination">
+						<button
+							class="date-nav"
+							type="button"
+							disabled={currentPage === 1}
+							onclick={() => (currentPage -= 1)}
+						>‹</button>
+						<span class="pag-info">{currentPage} / {totalPages}</span>
+						<button
+							class="date-nav"
+							type="button"
+							disabled={currentPage === totalPages}
+							onclick={() => (currentPage += 1)}
+						>›</button>
+					</div>
+				{/if}
 			{/if}
 		</div>
 
@@ -593,6 +635,12 @@
 .date-nav:hover {
 	background: var(--surface-hover);
 	color: var(--text-title);
+}
+
+.date-nav:disabled {
+	opacity: 0.3;
+	cursor: default;
+	pointer-events: none;
 }
 
 .date-days {
@@ -804,6 +852,23 @@
 	font-size: var(--fs-xs);
 	color: var(--text-faint);
 	font-family: monospace;
+}
+
+/* ── Pagination ─────────────────────────────────────────────────── */
+.pagination {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: var(--s-8);
+	padding: var(--s-12) 0 var(--s-4);
+	flex-shrink: 0;
+}
+
+.pag-info {
+	font-size: var(--fs-sm);
+	color: var(--text-faint);
+	min-width: 52px;
+	text-align: center;
 }
 
 /* ── Skeleton / empty ───────────────────────────────────────────── */

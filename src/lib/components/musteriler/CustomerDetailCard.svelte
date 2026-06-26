@@ -66,6 +66,7 @@
 		exchangeRate?: number;
 		createdAt: number;
 		createdBy: string;
+		companyId?: string;
 		deliveryType?: string;
 		deliveryFirm?: string;
 		deliveryPayment?: string;
@@ -212,6 +213,79 @@
 		},
 	};
 
+	// ─── Proforma PDF i18n ────────────────────────────────────────────────────
+	type ProformaLangDict = {
+		title: string;
+		docNo: string; contractNo: string;
+		customer: string; address: string; phone: string; email: string;
+		date: string; validUntil: string;
+		colImage: string; colCode: string; colDesc: string; colQty: string; colPrice: string; colTotal: string;
+		subtotal: string; discount: string; netSubtotal: string; vat: string; grandTotal: string;
+		techNotes: string; conditions: string;
+		deliveryType: string; productionDuration: string; paymentTerms: string; bank: string;
+		manufacturer: string; page: string;
+		rtl?: string;
+	};
+
+	const PROFORMA_I18N: Record<LangCode, ProformaLangDict> = {
+		tr: {
+			title: 'PROFORMA FATURA',
+			docNo: 'No', contractNo: 'Kontrat No',
+			customer: 'MÜŞTERİ', address: 'Adres', phone: 'Telefon', email: 'E-posta',
+			date: 'Tarih', validUntil: 'Geçerlilik',
+			colImage: 'Resim', colCode: 'KOD', colDesc: 'KARAKTERİSTİK', colQty: 'MİKTAR', colPrice: 'EXW FİYAT İzmir', colTotal: 'TUTAR',
+			subtotal: 'Ara Toplam', discount: 'İndirim', netSubtotal: 'Net Ara Toplam', vat: 'KDV', grandTotal: 'TOPLAM',
+			techNotes: 'TEKNİK NOTLAR', conditions: 'SİPARİŞ KOŞULLARI',
+			deliveryType: 'Teslimat Koşulları', productionDuration: 'Üretim Süresi', paymentTerms: 'Ödeme Koşulları', bank: 'BANKA',
+			manufacturer: 'Üretici', page: 'Sayfa',
+		},
+		en: {
+			title: 'PROFORMA INVOICE',
+			docNo: 'No', contractNo: 'Contract No',
+			customer: 'CLIENT', address: 'Address', phone: 'Phone', email: 'Email',
+			date: 'Date', validUntil: 'Valid Until',
+			colImage: 'Image', colCode: 'Code', colDesc: 'Description', colQty: 'Qty', colPrice: 'EXW Price Izmir', colTotal: 'Amount',
+			subtotal: 'Sub-Total', discount: 'Discount', netSubtotal: 'Net Subtotal', vat: 'VAT', grandTotal: 'TOTAL',
+			techNotes: 'Technical Notes', conditions: 'Order Conditions',
+			deliveryType: 'Delivery Terms', productionDuration: 'Production Time', paymentTerms: 'Payment Terms', bank: 'BANK',
+			manufacturer: 'Manufacturer', page: 'Page',
+		},
+		ru: {
+			title: 'СЧЁТ-ПРОФОРМА',
+			docNo: 'Номер', contractNo: 'Контракт №',
+			customer: 'КЛИЕНТ', address: 'Адрес', phone: 'Телефон', email: 'Эл. почта',
+			date: 'Дата', validUntil: 'Действителен до',
+			colImage: 'Фото', colCode: 'Код', colDesc: 'Характеристики', colQty: 'Кол-во', colPrice: 'Цена EXW Измир', colTotal: 'Сумма',
+			subtotal: 'Промежуточный итог', discount: 'Скидка', netSubtotal: 'Итого без НДС', vat: 'НДС', grandTotal: 'ИТОГО',
+			techNotes: 'ТЕХНИЧЕСКИЕ ПРИМЕЧАНИЯ', conditions: 'УСЛОВИЯ ЗАКАЗА',
+			deliveryType: 'Условия поставки', productionDuration: 'Срок производства', paymentTerms: 'Условия оплаты', bank: 'БАНК',
+			manufacturer: 'Производитель', page: 'Страница',
+		},
+		ar: {
+			title: 'فاتورة أولية',
+			docNo: 'الرقم', contractNo: 'عقد رقم',
+			customer: 'العميل', address: 'العنوان', phone: 'الهاتف', email: 'البريد الإلكتروني',
+			date: 'التاريخ', validUntil: 'صالح حتى',
+			colImage: 'صورة', colCode: 'الرمز', colDesc: 'الوصف', colQty: 'الكمية', colPrice: 'سعر EXW إزمير', colTotal: 'المبلغ',
+			subtotal: 'المجموع الفرعي', discount: 'الخصم', netSubtotal: 'المجموع الصافي', vat: 'ضريبة', grandTotal: 'الإجمالي الكلي',
+			techNotes: 'ملاحظات فنية', conditions: 'شروط الطلب',
+			deliveryType: 'شروط التوصيل', productionDuration: 'وقت الإنتاج', paymentTerms: 'شروط الدفع', bank: 'البنك',
+			manufacturer: 'المصنع', page: 'صفحة',
+			rtl: 'true',
+		},
+		fr: {
+			title: 'FACTURE PROFORMA',
+			docNo: 'N°', contractNo: 'N° Contrat',
+			customer: 'CLIENT', address: 'Adresse', phone: 'Téléphone', email: 'E-mail',
+			date: 'Date', validUntil: "Valable jusqu'au",
+			colImage: 'Image', colCode: 'Code', colDesc: 'Description', colQty: 'Qté', colPrice: 'Prix EXW Izmir', colTotal: 'Montant',
+			subtotal: 'Sous-total', discount: 'Remise', netSubtotal: 'Sous-total net', vat: 'TVA', grandTotal: 'TOTAL',
+			techNotes: 'NOTES TECHNIQUES', conditions: 'CONDITIONS DE COMMANDE',
+			deliveryType: 'Conditions de livraison', productionDuration: 'Délai de production', paymentTerms: 'Conditions de paiement', bank: 'BANQUE',
+			manufacturer: 'Fabricant', page: 'Page',
+		},
+	};
+
 	// ─── Constants ────────────────────────────────────────────────────────────
 	const TABS = [
 		{ value: 'info',     label: 'Bilgiler'   },
@@ -284,6 +358,9 @@
 	let langForType    = $state<'quote' | 'order'>('quote');
 	let langForEntity  = $state<OrderRow | null>(null);
 	let pdfGenerating  = $state(false);
+
+	let proformaModalOpen = $state(false);
+	let proformaEntity    = $state<OrderRow | null>(null);
 
 	let allOrderItems   = $state<ItemRow[]>([]);
 	let userProfileMap  = $state<Record<string, { id: string; name: string }>>({});
@@ -636,6 +713,11 @@
 		langModalOpen = true;
 	}
 
+	function openProformaModal(entity: OrderRow) {
+		proformaEntity    = entity;
+		proformaModalOpen = true;
+	}
+
 	async function loadItemsOnce(entityId: string): Promise<ItemRow[]> {
 		return new Promise((resolve) => {
 			const cleanup = db.subscribeQuery(
@@ -974,6 +1056,422 @@
 			pdfGenerating = false;
 		}
 	}
+
+	async function generateProformaPdf(lang: LangCode) {
+		if (!proformaEntity) return;
+		proformaModalOpen = false;
+		pdfGenerating = true;
+		try {
+			const entity    = proformaEntity as OrderRow & { companyId?: string };
+			const { jsPDF } = await import('jspdf');
+
+			const PL    = PROFORMA_I18N[lang];
+			const isRtl = PL.rtl === 'true';
+			const sym   = entity.currency === 'TRY' ? 'TL'
+			            : entity.currency === 'USD' ? '$'
+			            : entity.currency === 'EUR' ? '€'
+			            : entity.currency === 'GBP' ? '£'
+			            : (entity.currency || 'TL');
+			const localeMap: Record<string, string> = { tr: 'tr-TR', en: 'en-GB', ru: 'ru-RU', ar: 'ar-SA', fr: 'fr-FR' };
+			const locale    = localeMap[lang] ?? 'tr-TR';
+
+			// ── Logo
+			async function fetchLogoBase64(url: string): Promise<string | null> {
+				try {
+					const resp = await fetch(url);
+					if (!resp.ok) return null;
+					const blob = await resp.blob();
+					return await new Promise<string>((res, rej) => {
+						const reader   = new FileReader();
+						reader.onload  = () => res(reader.result as string);
+						reader.onerror = rej;
+						reader.readAsDataURL(blob);
+					});
+				} catch {
+					return null;
+				}
+			}
+
+			let logoUrl: string | null = authStore.companies.find(c => c.id === entity.companyId)?.logoUrl ?? null;
+			if (!logoUrl && entity.companyId) {
+				const compRes = await db.queryOnce({ companies: { $: { where: { id: entity.companyId } } } });
+				const comp    = ((compRes.data?.companies ?? []) as { logoUrl?: string }[])[0];
+				logoUrl       = comp?.logoUrl ?? null;
+			}
+			const logoBase64 = logoUrl ? await fetchLogoBase64(logoUrl) : null;
+
+			// ── Items
+			const loadedItems = await loadItemsOnce(entity.id);
+			const typedItems  = loadedItems as (ItemRow & { productId?: string })[];
+
+			// ── Ürün görselleri (toplu)
+			const productIds = [...new Set(typedItems.map(i => i.productId).filter((pid): pid is string => !!pid))];
+			const photoMap: Record<string, string> = {};
+			if (productIds.length > 0) {
+				const prodRes = await db.queryOnce({ products: { $: { where: { id: { in: productIds } } } } });
+				const prods   = (prodRes.data?.products ?? []) as { id: string; photo?: string; photoUrls?: string[] }[];
+				for (const p of prods) {
+					const photo = p.photo ?? (Array.isArray(p.photoUrls) ? p.photoUrls[0] : undefined) ?? null;
+					if (photo) photoMap[p.id] = photo;
+				}
+			}
+
+			// ── jsPDF
+			const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
+			const W   = 210;
+			const ML  = 15;
+			const MR  = W - 15;
+			const TW  = MR - ML;
+
+			doc.addFileToVFS('NotoSans.ttf', notoSansBase64);
+			doc.addFont('NotoSans.ttf', 'NotoSans', 'normal');
+			doc.addFileToVFS('NotoSansArabic.ttf', notoSansArabicBase64);
+			doc.addFont('NotoSansArabic.ttf', 'NotoSansArabic', 'normal');
+
+			function setFnt(size = 9) {
+				doc.setFontSize(size);
+				doc.setFont(isRtl ? 'NotoSansArabic' : 'NotoSans', 'normal');
+			}
+
+			function drawFooter(pn: number) {
+				doc.setFillColor(240, 240, 240);
+				doc.rect(0, 284, W, 13, 'F');
+				setFnt(7);
+				doc.setTextColor(100, 100, 100);
+				doc.text(`${PL.page} ${pn}`, W / 2, 291.5, { align: 'center' });
+				doc.setTextColor(0, 0, 0);
+			}
+
+			function checkPage(y: number, needed = 12): number {
+				if (y + needed > 272) {
+					doc.addPage();
+					setFnt();
+					return 15;
+				}
+				return y;
+			}
+
+			const today    = new Date(entity.createdAt).toLocaleDateString(locale);
+			const validStr = entity.validUntil ? new Date(entity.validUntil).toLocaleDateString(locale) : '';
+			const poNum    = entity.purchaseOrderNumber ?? '';
+
+			// ═══ SAYFA 1
+			let y = 10;
+
+			// ── A) LOGO — ortalı, max 120 mm
+			if (logoBase64) {
+				try {
+					const fmt   = logoBase64.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+					const logoW = 120;
+					const logoH = 28;
+					const logoX = (W - logoW) / 2;
+					doc.addImage(logoBase64, fmt, logoX, y, logoW, logoH, undefined, 'FAST');
+					y += logoH + 5;
+				} catch {
+					y += 5;
+				}
+			}
+
+			// ── B) BAŞLIK
+			setFnt(18);
+			doc.setFont(isRtl ? 'NotoSansArabic' : 'NotoSans', 'normal');
+			doc.text(PL.title, W / 2, y + 8, { align: 'center' });
+			y += 14;
+
+			doc.setDrawColor(180, 180, 180);
+			doc.line(ML, y, MR, y);
+			y += 6;
+
+			// ── C) META — Müşteri (sol) + Belge (sağ)
+			const colL  = ML;
+			const colR  = ML + TW / 2 + 3;
+			const metaW = TW / 2 - 6;
+
+			function metaRowP(label: string, val: string | undefined, cx: number, cy: number): number {
+				if (!val) return cy;
+				setFnt(8);
+				const lines = doc.splitTextToSize(val, metaW - 26);
+				if (isRtl) {
+					doc.setTextColor(100, 100, 100);
+					doc.text(`${val} :${label}`, cx + metaW, cy, { align: 'right' });
+				} else {
+					doc.setTextColor(100, 100, 100);
+					doc.text(`${label}:`, cx, cy);
+					doc.setTextColor(20, 20, 20);
+					doc.text(lines, cx + 26, cy);
+					cy += (lines.length - 1) * 4.5;
+				}
+				doc.setTextColor(0, 0, 0);
+				return cy + 5.5;
+			}
+
+			let yL = y;
+			let yR = y;
+
+			const cAddr = [customer?.address, customer?.city, customer?.country].filter(Boolean).join(', ');
+			yL = metaRowP(PL.customer, customer?.name ?? '', colL, yL);
+			if (cAddr)           yL = metaRowP(PL.address, cAddr,          colL, yL);
+			if (customer?.phone) yL = metaRowP(PL.phone,   customer.phone, colL, yL);
+			if (customer?.email) yL = metaRowP(PL.email,   customer.email, colL, yL);
+
+			yR = metaRowP(PL.docNo,     entity.orderNumber ?? '', colR, yR);
+			yR = metaRowP(PL.date,      today,                    colR, yR);
+			if (validStr) yR = metaRowP(PL.validUntil, validStr,  colR, yR);
+			if (poNum)    yR = metaRowP(PL.contractNo, poNum,      colR, yR);
+
+			y = Math.max(yL, yR) + 5;
+			doc.setDrawColor(200, 200, 200);
+			doc.line(ML, y, MR, y);
+			y += 6;
+
+			// ── D) ÜRÜN TABLOSU
+			// Sütunlar: # 7 | görsel 22 | kod 25 | açıklama 61 | miktar 15 | fiyat 27 | tutar 23
+			const C = {
+				num:   ML,
+				img:   ML + 7,
+				kod:   ML + 29,
+				desc:  ML + 54,
+				qty:   ML + 115,
+				price: ML + 130,
+				total: ML + 157,
+			};
+			const CW = {
+				num:   7,
+				img:   22,
+				kod:   25,
+				desc:  61,
+				qty:   15,
+				price: 27,
+				total: MR - (ML + 157),
+			};
+
+			const HDR_H = 9;
+			doc.setFillColor(25, 25, 25);
+			doc.rect(ML, y, TW, HDR_H, 'F');
+			doc.setTextColor(210, 210, 210);
+			setFnt(7);
+
+			if (!isRtl) {
+				doc.text('#',         C.num + CW.num / 2,      y + 6, { align: 'center' });
+				doc.text(PL.colImage, C.img + CW.img / 2,      y + 6, { align: 'center' });
+				doc.text(PL.colCode,  C.kod + 1,                y + 6);
+				doc.text(PL.colDesc,  C.desc + 1,               y + 6);
+				doc.text(PL.colQty,   C.qty + CW.qty / 2,      y + 6, { align: 'center' });
+				doc.text(PL.colPrice, C.price + CW.price / 2,  y + 6, { align: 'center' });
+				doc.text(PL.colTotal, MR - 1,                   y + 6, { align: 'right' });
+			} else {
+				doc.text('#',         MR - CW.num / 2,                         y + 6, { align: 'center' });
+				doc.text(PL.colImage, MR - CW.num - CW.img / 2,               y + 6, { align: 'center' });
+				doc.text(PL.colCode,  MR - CW.num - CW.img - 1,               y + 6, { align: 'right' });
+				doc.text(PL.colDesc,  MR - CW.num - CW.img - CW.kod - 1,      y + 6, { align: 'right' });
+				doc.text(PL.colQty,   ML + CW.total + CW.price + CW.qty / 2,  y + 6, { align: 'center' });
+				doc.text(PL.colPrice, ML + CW.total + CW.price / 2,            y + 6, { align: 'center' });
+				doc.text(PL.colTotal, ML + 1,                                   y + 6, { align: 'left' });
+			}
+			doc.setTextColor(0, 0, 0);
+			y += HDR_H;
+
+			const VLINES = [ML, C.img, C.kod, C.desc, C.qty, C.price, C.total, MR];
+			function drawRowBox(rowY: number, rowH: number) {
+				doc.setDrawColor(200, 200, 200);
+				for (const cx of VLINES) doc.line(cx, rowY, cx, rowY + rowH);
+				doc.line(ML, rowY + rowH, MR, rowY + rowH);
+			}
+
+			const descKey: Record<LangCode, DescKey> = {
+				tr: 'descTR', en: 'descEN', ru: 'descRU', ar: 'descAR', fr: 'descFR'
+			};
+			const dKey  = descKey[lang];
+			const IMG_S = 18;
+
+			const sorted = [...typedItems]
+				.filter(item => !item.isIncludedPart)
+				.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+
+			let rowIdx = 0;
+			for (const item of sorted) {
+				rowIdx++;
+				const descTxt = String(item[dKey] ?? item.descEN ?? item.descTR ?? item.productName ?? '').trim();
+				const descLns = doc.splitTextToSize(descTxt, CW.desc - 2);
+				const codeLns = doc.splitTextToSize(item.productSku ?? '', CW.kod - 2);
+				const textH   = Math.max(descLns.length, codeLns.length) * 4.5 + 4;
+				const rowH    = Math.max(IMG_S + 3, textH);
+
+				y = checkPage(y, rowH + 1);
+
+				const bg = rowIdx % 2 === 0 ? [245, 247, 250] : [255, 255, 255];
+				doc.setFillColor(bg[0], bg[1], bg[2]);
+				doc.rect(ML, y, TW, rowH, 'F');
+
+				if (item.productId) {
+					const imgSrc = photoMap[item.productId];
+					if (imgSrc) {
+						try {
+							const fmt  = imgSrc.startsWith('data:image/png') ? 'PNG' : 'JPEG';
+							const imgX = isRtl
+								? MR - CW.num - (CW.img + IMG_S) / 2
+								: C.img + (CW.img - IMG_S) / 2;
+							doc.addImage(imgSrc, fmt, imgX, y + (rowH - IMG_S) / 2, IMG_S, IMG_S, undefined, 'FAST');
+						} catch { /* görsel atla */ }
+					}
+				}
+
+				setFnt(8);
+				doc.setTextColor(20, 20, 20);
+				const tY = y + 5;
+
+				if (!isRtl) {
+					doc.text(String(rowIdx),             C.num + CW.num / 2,          tY, { align: 'center' });
+					doc.text(codeLns,                    C.kod + 1,                   tY);
+					doc.text(descLns,                    C.desc + 1,                  tY);
+					doc.text(String(item.quantity ?? 0), C.qty + CW.qty / 2,          tY, { align: 'center' });
+					doc.text(fmtPdf(item.unitPrice ?? 0, sym),        C.price + CW.price - 1, tY, { align: 'right' });
+					doc.text(fmtPdf(item.lineTotalWithVat ?? 0, sym), MR - 1,                  tY, { align: 'right' });
+				} else {
+					doc.text(String(rowIdx),             ML + CW.num / 2,                            tY, { align: 'center' });
+					doc.text(codeLns,                    MR - CW.num - CW.img - 1,                  tY, { align: 'right' });
+					doc.text(descLns,                    MR - CW.num - CW.img - CW.kod - 1,         tY, { align: 'right' });
+					doc.text(String(item.quantity ?? 0), ML + CW.total + CW.price + CW.qty / 2,     tY, { align: 'center' });
+					doc.text(fmtPdf(item.unitPrice ?? 0, sym),        ML + CW.total + CW.price - 1, tY, { align: 'right' });
+					doc.text(fmtPdf(item.lineTotalWithVat ?? 0, sym), ML + 1,                        tY, { align: 'left' });
+				}
+
+				drawRowBox(y, rowH);
+				doc.setTextColor(0, 0, 0);
+				y += rowH;
+			}
+
+			// ── E) TOPLAMLAR
+			y += 6;
+			y = checkPage(y, 32);
+			doc.setDrawColor(180, 180, 180);
+			doc.line(ML + TW * 0.55, y, MR, y);
+			y += 5;
+
+			function totRowP(label: string, value: string, bold = false) {
+				setFnt(bold ? 10 : 9);
+				doc.setTextColor(80, 80, 80);
+				if (isRtl) {
+					doc.text(`${value} :${label}`, MR, y, { align: 'right' });
+				} else {
+					doc.text(`${label}:`, ML + TW * 0.55, y);
+					doc.setTextColor(bold ? 0 : 30, bold ? 0 : 30, bold ? 0 : 30);
+					doc.text(value, MR, y, { align: 'right' });
+				}
+				doc.setTextColor(0, 0, 0);
+				y += bold ? 8 : 6;
+			}
+
+			const grossTotal    = loadedItems.reduce((s, it) => s + it.listPrice * it.quantity, 0);
+			const totalDiscount = loadedItems.reduce((s, it) => s + it.listPrice * it.quantity * ((it.discountRate ?? 0) / 100), 0);
+			const netSubtotalVal = grossTotal - totalDiscount;
+			const vatTotal      = entity.totalVat    ?? 0;
+			const grandTotal    = entity.totalWithVat ?? 0;
+
+			totRowP(PL.subtotal,    fmtPdf(grossTotal,    sym));
+			totRowP(PL.discount,    fmtPdf(-totalDiscount, sym));
+			totRowP(PL.netSubtotal, fmtPdf(netSubtotalVal, sym));
+			totRowP(PL.vat,         fmtPdf(vatTotal,      sym));
+			y += 1;
+			doc.setDrawColor(160, 160, 160);
+			doc.line(ML + TW * 0.55, y, MR, y);
+			y += 3;
+			totRowP(PL.grandTotal,  fmtPdf(grandTotal,    sym), true);
+
+			// ── F) TEKNİK NOTLAR
+			if (entity.notes?.trim()) {
+				y += 4;
+				y = checkPage(y, 20);
+				doc.setDrawColor(200, 200, 200);
+				doc.line(ML, y, MR, y);
+				y += 5;
+				setFnt(8.5);
+				doc.setTextColor(40, 40, 40);
+				doc.text(PL.techNotes + ':', isRtl ? MR : ML, y, { align: isRtl ? 'right' : 'left' });
+				y += 6;
+				setFnt(8);
+				doc.setTextColor(60, 60, 60);
+				const noteLines = doc.splitTextToSize(entity.notes.trim(), TW);
+				for (const line of noteLines) {
+					y = checkPage(y, 6);
+					doc.text(line, isRtl ? MR : ML, y, { align: isRtl ? 'right' : 'left' });
+					y += 5;
+				}
+				doc.setTextColor(0, 0, 0);
+			}
+
+			// ── G) KOŞULLAR (teslimat/ödeme sol, banka sağ)
+			const hasConditions = entity.deliveryType || entity.paymentType || entity.productionDuration || entity.bankAccount;
+			if (hasConditions) {
+				y += 4;
+				y = checkPage(y, 32);
+				doc.setDrawColor(200, 200, 200);
+				doc.line(ML, y, MR, y);
+				y += 5;
+				setFnt(8.5);
+				doc.setTextColor(40, 40, 40);
+				doc.text(PL.conditions + ':', isRtl ? MR : ML, y, { align: isRtl ? 'right' : 'left' });
+				y += 6;
+
+				const condL = ML;
+				const condR = ML + TW / 2 + 3;
+				const condW = TW / 2 - 6;
+				let yCL     = y;
+				let yCR     = y;
+
+				function condRow(label: string, val: string | undefined, cx: number, cy: number): number {
+					if (!val) return cy;
+					setFnt(8);
+					const ls = doc.splitTextToSize(val, condW - 26);
+					if (isRtl) {
+						doc.setTextColor(100, 100, 100);
+						doc.text(`${val} :${label}`, cx + condW, cy, { align: 'right' });
+					} else {
+						doc.setTextColor(100, 100, 100);
+						doc.text(`${label}:`, cx, cy);
+						doc.setTextColor(20, 20, 20);
+						doc.text(ls, cx + 26, cy);
+						cy += (ls.length - 1) * 4.5;
+					}
+					doc.setTextColor(0, 0, 0);
+					return cy + 5.5;
+				}
+
+				yCL = condRow(PL.deliveryType,       entity.deliveryType,        condL, yCL);
+				yCL = condRow(PL.productionDuration,  entity.productionDuration,  condL, yCL);
+				yCL = condRow(PL.paymentTerms,        entity.paymentType,         condL, yCL);
+
+				if (entity.bankAccount) {
+					setFnt(8.5);
+					doc.setTextColor(40, 40, 40);
+					doc.text(PL.bank + ':', isRtl ? condR + condW : condR, yCR, { align: isRtl ? 'right' : 'left' });
+					yCR += 6;
+					setFnt(8);
+					doc.setTextColor(20, 20, 20);
+					const bankLines = doc.splitTextToSize(entity.bankAccount, condW);
+					for (const bl of bankLines) {
+						yCR = checkPage(yCR, 6);
+						doc.text(bl, isRtl ? condR + condW : condR, yCR, { align: isRtl ? 'right' : 'left' });
+						yCR += 5;
+					}
+					doc.setTextColor(0, 0, 0);
+				}
+
+				y = Math.max(yCL, yCR) + 4;
+			}
+
+			// ── H) FOOTER her sayfaya
+			const totalPages = doc.getNumberOfPages();
+			for (let p = 1; p <= totalPages; p++) {
+				doc.setPage(p);
+				drawFooter(p);
+			}
+
+			doc.save(`PROFORMA-${entity.orderNumber ?? 'DOC'}.pdf`);
+		} finally {
+			pdfGenerating = false;
+		}
+	}
 </script>
 
 <!-- ─── Loading ─────────────────────────────────────────────────────────────── -->
@@ -1303,6 +1801,12 @@
 													<path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" />
 												</svg>
 											</button>
+											<button
+												type="button"
+												onclick={() => openProformaModal(quote)}
+												class="flex h-7 items-center rounded-lg border border-[#2a2a2a] px-2 text-xs text-[#666] transition hover:border-[#444] hover:text-white"
+												title="Proforma PDF"
+											>Proforma</button>
 										</div>
 									</div>
 								{/each}
@@ -1662,6 +2166,59 @@
 	</div>
 {/if}
 
+<!-- ─── Proforma dil seçim modalı ────────────────────────────────────────── -->
+{#if proformaModalOpen}
+	<div
+		class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+		role="dialog"
+		aria-modal="true"
+		aria-label="Proforma PDF dil seçimi"
+		tabindex="-1"
+		onclick={() => (proformaModalOpen = false)}
+		onkeydown={(e) => e.key === 'Escape' && (proformaModalOpen = false)}
+	>
+		<div
+			class="relative w-75 rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a] p-6 shadow-2xl"
+			role="presentation"
+			onclick={(e) => e.stopPropagation()}
+		>
+			<button
+				type="button"
+				onclick={() => (proformaModalOpen = false)}
+				class="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-[#555] hover:bg-[#2a2a2a] hover:text-white transition"
+				aria-label="Kapat"
+			>
+				<svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
+					<path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+				</svg>
+			</button>
+
+			<h3 class="mb-5 text-center text-sm font-bold text-white">Proforma PDF Dili</h3>
+
+			<div class="flex flex-col gap-2">
+				{#each LANGS as lang (lang.code)}
+					<button
+						type="button"
+						disabled={pdfGenerating}
+						onclick={() => generateProformaPdf(lang.code)}
+						class="flex items-center gap-3 rounded-xl border border-[#2a2a2a] bg-[#111] px-4 py-3 text-sm font-medium text-white transition hover:border-[#444] hover:bg-[#222] disabled:opacity-50"
+					>
+						<span class="text-xl leading-none">{lang.flag}</span>
+						<span>{lang.label}</span>
+						{#if pdfGenerating}
+							<span class="ml-auto h-3 w-3 animate-spin rounded-full border border-white border-t-transparent"></span>
+						{/if}
+					</button>
+				{/each}
+			</div>
+
+			{#if pdfGenerating}
+				<p class="mt-4 text-center text-xs text-[#555]">Proforma PDF oluşturuluyor...</p>
+			{/if}
+		</div>
+	</div>
+{/if}
+
 <!-- ─── Detail modal ─────────────────────────────────────────────────────── -->
 {#if detailOpen && detailEntity}
 	{@const de = detailEntity}
@@ -1680,8 +2237,8 @@
 			onclick={(e) => e.stopPropagation()}
 		>
 			<!-- Header -->
-			<div class="shrink-0 flex items-center justify-between border-b border-[#2a2a2a] px-6 py-4">
-				<div>
+			<div class="shrink-0 flex items-start justify-between border-b border-[#2a2a2a] px-6 py-4">
+				<div class="shrink-0">
 					<p class="text-base font-bold text-white">
 						{(de as OrderRow).orderNumber}
 					</p>
@@ -1689,7 +2246,15 @@
 						{formatDate(de.createdAt)}{customer ? ' · ' + customer.name : ''}
 					</p>
 				</div>
-				<div class="flex items-center gap-3">
+				{#if de.companyId}
+					{@const companyName = authStore.companies.find((c) => c.id === de.companyId)?.name}
+					{#if companyName}
+						<p class="flex-1 px-6 text-base font-semibold text-[#aaa] truncate text-center">
+							{companyName.toLocaleUpperCase('tr')}
+						</p>
+					{/if}
+				{/if}
+				<div class="flex items-center gap-3 shrink-0">
 					{#if statusConfig[de.status]}
 						{@const sc = statusConfig[de.status]!}
 						<Badge variant={sc.variant} label={sc.label} />

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Migration: $users içinde userProfiles'ı olmayan kullanıcılar için profil oluşturur.
  *
@@ -24,7 +25,7 @@ async function run() {
 	// 1. Tüm $users'ı admin SDK ile çek
 	console.log('📋  $users çekiliyor...');
 	const usersResult = await db.query({ $users: {} } as any);
-	const usersData   = usersResult.data ?? usersResult as any;
+	const usersData   = (usersResult.data ?? usersResult) as any;
 	// Admin SDK bazı versiyonlarda key'i '$users' yerine 'users' olarak döndürebilir
 	const users: Array<{ id: string; email: string }> =
 		usersData['$users'] ?? usersData['users'] ?? [];
@@ -33,7 +34,7 @@ async function run() {
 	// 2. Tüm mevcut userProfiles'ı çek
 	console.log('📋  userProfiles çekiliyor...');
 	const profileResult = await db.query({ userProfiles: {} });
-	const profileData   = profileResult.data ?? profileResult as any;
+	const profileData   = ((profileResult as any).data ?? profileResult) as any;
 	const profiles      = profileData['userProfiles'] ?? [];
 	console.log(`   ${profiles.length} mevcut profil bulundu`);
 

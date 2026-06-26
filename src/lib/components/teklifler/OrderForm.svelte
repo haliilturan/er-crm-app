@@ -1,4 +1,5 @@
 <script lang="ts">
+	/* eslint-disable @typescript-eslint/no-unused-vars */
 	import { untrack } from 'svelte';
 	import { db, id, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';
@@ -23,7 +24,7 @@
 	};
 
 	let {
-		customerId,
+		customerId: _customerId,
 		onClose,
 		onSaved,
 		editOrder = null
@@ -35,6 +36,15 @@
 	} = $props();
 
 	const isOwner = $derived(!editOrder || editOrder.createdBy === authStore.userId);
+
+	interface OrderItem {
+		id: string; sortOrder?: number; productId?: string;
+		productName?: string; productSku?: string; brandName?: string;
+		unit?: string; quantity?: number; listPrice?: number;
+		discountRate?: number; vatRate?: number; notes?: string;
+		isIncludedPart?: boolean; productCategory?: string;
+		descTR?: string; descEN?: string; descRU?: string; descAR?: string; descFR?: string;
+	}
 
 	// ─── Active companies ────────────────────────────────────────────────────────
 	type CompanyRow = { id: string; name: string };
@@ -140,7 +150,7 @@
 				untrack(() => {
 					if (!result.data) return;
 					if (editItemsLoaded) return;
-					const raw = ((result.data?.orderItems ?? []) as any[])
+					const raw = ((result.data?.orderItems ?? []) as OrderItem[])
 						.slice()
 						.sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 					editItemIds = raw.map((it) => String(it.id));
@@ -178,6 +188,7 @@
 
 	// ─── Build order item ops ─────────────────────────────────────────────────────
 	function buildItemOps(orderId: string) {
+		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const ops: any[] = [];
 		for (let i = 0; i < items.length; i++) {
 			const it     = items[i];
@@ -267,9 +278,7 @@
 				console.log('✓ create items OK');
 			} catch (e: unknown) { console.error('✗ create items FAILED:', JSON.stringify(e, Object.getOwnPropertyNames(e as object))); }
 
-			saving = false; return;
-			// ── END DIAGNOSTIC ───────────────────────────────────────────────────────
-
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			const ops: any[] = [
 				tx.orders[orderId].update({
 					currency,
@@ -302,7 +311,7 @@
 					description:         '1 sipariş güncelledi',
 					relatedEntityType:   'order',
 					relatedEntityId:     orderId,
-					relatedEntityNumber: editOrder.orderNumber,
+					relatedEntityNumber: editOrder!.orderNumber,
 					createdAt:           now
 				})
 			]).catch((err) => console.error('[OrderForm] activityFeed error:', err));

@@ -90,7 +90,7 @@
 		if (q.length < 3) {
 			// Default: last 5 recently updated active products
 			return db.subscribeQuery(
-				{ products: { $: { where: { status: 'active' }, order: { updatedAt: 'desc' }, limit: 5 } } },
+				{ products: { $: { where: { status: 'active' }, order: { serverCreatedAt: 'desc' }, limit: 5 } } },
 				(result) => {
 					untrack(() => {
 						displayProducts = (result.data?.products ?? []) as ProductRaw[];
@@ -572,9 +572,9 @@
 		item.productName     = p.name;
 		item.productSku      = p.sku;
 		item.brandName       = p.brandName ?? '';
-		item.productDetail   = (p as any).detail;
-		item.productCode     = (p as any).code;
-		item.productSerialNo = (p as any).serialNo;
+		item.productDetail   = p.detail ?? '';
+		item.productCode     = p.code ?? '';
+		item.productSerialNo = p.serialNo ?? '';
 		item.productCategory = p.category ?? '';
 		item.productFirm     = p.brandName ?? '';
 		item.vatRate         = 20;

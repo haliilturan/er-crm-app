@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 /**
  * Migration:
  *   1. orderId field'ı olan ama InstantDB link'i eksik orderItems kayıtlarını linkler.

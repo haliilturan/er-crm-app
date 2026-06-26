@@ -1,4 +1,5 @@
 <script lang="ts">
+	/* eslint-disable @typescript-eslint/no-explicit-any */
 	import { untrack } from 'svelte';
 	import { db, id, tx } from '$lib/instant';
 	import { authStore } from '$lib/stores/auth.svelte';

@@ -77,11 +77,11 @@ async function main() {
 		userCompanies: UserCompany[];
 	};
 
-	const existingSlugs      = new Set(existing.companies.map(c => c.slug));
+	const existingNames      = new Set(existing.companies.map(c => c.name.toLowerCase().trim()));
 	const existingProfile    = existing.userProfiles.find(p => p.email === TARGET_EMAIL);
 	const existingCompanyIds = new Set(existing.userCompanies.map(uc => uc.companyId));
 
-	console.log(`  Mevcut şirket slug'ları : [${[...existingSlugs].join(', ')}]`);
+	console.log(`  Mevcut şirket isimleri  : [${[...existingNames].join(', ')}]`);
 	console.log(`  Mevcut profil           : ${existingProfile ? existingProfile.id : 'yok'}`);
 	console.log(`  Mevcut üyelik sayısı    : ${existingCompanyIds.size}\n`);
 
@@ -89,7 +89,7 @@ async function main() {
 	const now = Date.now();
 
 	const toCreate = COMPANIES
-		.filter(c => !existingSlugs.has(c.slug))
+		.filter(c => !existingNames.has(c.name.toLowerCase().trim()))
 		.map(c => ({ ...c, companyId: id(), ucId: id() }));
 
 	const profileId   = existingProfile?.id ?? id();
@@ -152,7 +152,7 @@ async function main() {
 		toCreate.forEach(c => console.log(`  ✓  ${c.name}  (${c.companyId})`));
 	}
 
-	const skipped = COMPANIES.filter(c => existingSlugs.has(c.slug));
+	const skipped = COMPANIES.filter(c => existingNames.has(c.name.toLowerCase().trim()));
 	if (skipped.length > 0) {
 		console.log('\nAtlanan şirketler (zaten mevcut):');
 		skipped.forEach(c => console.log(`  ⚠  ${c.name}`));

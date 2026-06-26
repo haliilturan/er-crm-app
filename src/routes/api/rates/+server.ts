@@ -42,7 +42,7 @@ export async function POST() {
 		// Mevcut prices kayıtlarını çek
 		const existing = await db.query({ prices: {} });
 		const existingMap = Object.fromEntries(
-			(existing.prices ?? []).map((p: { id: string; key: string }) => [p.key, p.id])
+			(existing.prices ?? []).map((p) => [p['key'] as string, p.id as string])
 		);
 
 		// Upsert — varsa güncelle, yoksa oluştur

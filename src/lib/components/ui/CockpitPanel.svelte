@@ -239,16 +239,20 @@
 	async function completeTask(task: Task) {
 		completing = task.id;
 		try {
+			const now       = Date.now();
+			const actorName = profileByUserId[authStore.userId ?? '']?.fullName ?? authStore.userEmail ?? '';
+
 			await db.transact([
 				tx.tasks[task.id].update({ status: 'done' }),
-				tx.notifications[id()].update({
-					userId:    task.createdBy,
-					type:      'task_completed',
-					title:     'Görev Tamamlandı',
-					body:      `"${task.title}" görevi tamamlandı.`,
-					entityId:  task.id,
-					companyId: task.companyId,
-					createdAt: Date.now()
+				tx.activityFeed[id()].merge({
+					type:              'task_completed',
+					companyId:         task.companyId ?? '',
+					actorId:           authStore.userId ?? '',
+					actorName,
+					description:       `"${task.title ?? ''}" görevini tamamladı`,
+					relatedEntityType: 'task',
+					relatedEntityId:   task.id,
+					createdAt:         now
 				})
 			]);
 			expandedId = null;
@@ -952,6 +956,14 @@
 														class="px-2.5 py-1 rounded-full border border-[#2a2a2a] text-[10px] text-[#666] hover:text-white hover:border-[#444] transition-colors"
 													>Kapat</button>
 
+													<!-- Complete -->
+													<button
+														type="button"
+														onclick={() => completeTask(task)}
+														disabled={completing === task.id}
+														class="px-2.5 py-1 rounded-full border border-green-800/50 text-[10px] text-green-400 hover:bg-green-900/30 hover:border-green-700 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+													>{completing === task.id ? '…' : 'Tamamlandı'}</button>
+
 													<!-- Message icon -->
 													<button
 														type="button"
@@ -974,18 +986,6 @@
 														</button>
 													{/if}
 
-													<!-- Complete (only for the assigned user, not the sender) -->
-													{#if task.assignedTo === authStore.userId && task.createdBy !== authStore.userId}
-														<button
-															type="button"
-															onclick={() => completeTask(task)}
-															disabled={completing === task.id}
-															style={completing === task.id ? 'pointer-events: none' : ''}
-															class="ml-auto px-3 py-1 rounded-full bg-white text-black text-[10px] font-semibold hover:bg-[#e8e8e8] transition-colors disabled:opacity-50"
-														>
-															{completing === task.id ? '…' : 'Tamamla'}
-														</button>
-													{/if}
 												</div>
 											{/if}
 										{/if}

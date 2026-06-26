@@ -20,18 +20,18 @@
 	let orders   = $state<Order[]>([]);
 	let loading  = $state(true);
 
-	let companyId = $derived(authStore.activeCompanyId ?? '');
+	let companyIds = $derived(authStore.companyIds);
 
 	$effect(() => {
-		const cId = companyId;
-		if (!cId) return;
+		const cIds = companyIds;
+		if (!cIds.length) return;
 		loading = true;
 		return db.subscribeQuery(
 			{
 				orders: {
 					$: {
 						where: {
-							companyId: cId,
+							companyId: { in: cIds },
 							status: { in: ['in_production', 'shipped', 'completed', 'cancelled'] }
 						},
 						order: { createdAt: 'desc' }

@@ -136,7 +136,7 @@
 	function toggleList(e?: MouseEvent) {
 		e?.preventDefault();
 		e?.stopPropagation();
-		isOpen ? closeDropdown() : openList();
+		if (isOpen) { closeDropdown(); } else { openList(); }
 	}
 
 	function selectOption(opt: Option) {

@@ -56,19 +56,19 @@
 	let barChartContainer  = $state<HTMLElement | null>(null);
 	let lineChartContainer = $state<HTMLElement | null>(null);
 
-	let companyId = $derived(authStore.activeCompanyId ?? '');
+	let companyIds = $derived(authStore.companyIds);
 
 	// ── Data fetch ─────────────────────────────────────────────────────────────
 	$effect(() => {
-		const cId = companyId;
-		if (!cId) return;
+		const cIds = companyIds;
+		if (!cIds.length) return;
 		loading = true;
 		const u1 = db.subscribeQuery(
-			{ orders: { $: { where: { companyId: cId, status: { in: ['draft', 'pending_finance'] } } } } },
+			{ orders: { $: { where: { companyId: { in: cIds }, status: { in: ['draft', 'pending_finance'] } } } } },
 			(r) => untrack(() => { quotes = (r.data?.orders ?? []) as Quote[]; })
 		);
 		const u2 = db.subscribeQuery(
-			{ orders: { $: { where: { companyId: cId, status: { in: ['in_production', 'shipped', 'completed', 'cancelled'] } } } } },
+			{ orders: { $: { where: { companyId: { in: cIds }, status: { in: ['in_production', 'shipped', 'completed', 'cancelled'] } } } } },
 			(r) => untrack(() => { orders = (r.data?.orders ?? []) as Order[]; loading = false; })
 		);
 		const u3 = db.subscribeQuery(
@@ -84,6 +84,7 @@
 		if (p === 'daily')  return new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
 		if (p === 'weekly') {
 			const day = now.getDay() || 7;
+			// eslint-disable-next-line svelte/prefer-svelte-reactivity
 			const d = new Date(now);
 			d.setDate(now.getDate() - day + 1);
 			return new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -157,6 +158,7 @@
 			const DAYS = ['Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt', 'Paz'];
 			const day = now.getDay() || 7;
 			return DAYS.map((label, i) => {
+				// eslint-disable-next-line svelte/prefer-svelte-reactivity
 				const d = new Date(now);
 				d.setDate(now.getDate() - day + 1 + i);
 				const s = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
@@ -384,6 +386,7 @@
 			setFnt();
 
 			// RTL-aware text: mirrors x and forces align:'right' for Arabic
+			// eslint-disable-next-line @typescript-eslint/no-explicit-any
 			function txt(s: string, x: number, y: number, o?: Record<string, any>) {
 				if (isRTL) doc.text(s, PAGE_W - x, y, { ...(o ?? {}), align: 'right' });
 				else       doc.text(s, x, y, o);
@@ -391,6 +394,7 @@
 
 			// RTL-aware rect: mirrors x origin so panel sides swap
 			function rct(x: number, y: number, w: number, h: number, s: string) {
+				// eslint-disable-next-line @typescript-eslint/no-explicit-any
 				doc.rect(isRTL ? PAGE_W - x - w : x, y, w, h, s as any);
 			}
 

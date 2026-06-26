@@ -33,8 +33,8 @@ async function run() {
   const { brands: mevcutlar = [] } = await db.query({ brands: {} });
   console.log(`Mevcut marka sayısı: ${mevcutlar.length}`);
 
-  const mevcutSluglar = new Set(mevcutlar.map(b => b.slug));
-  const eklenecekler  = BRANDS.filter(b => !mevcutSluglar.has(b.slug));
+  const mevcutNames  = new Set(mevcutlar.map(b => (b.name ?? '').toLowerCase().trim()));
+  const eklenecekler = BRANDS.filter(b => !mevcutNames.has((b.name ?? '').toLowerCase().trim()));
 
   if (eklenecekler.length === 0) {
     console.log('Tüm markalar zaten mevcut, işlem gerekmiyor.');
