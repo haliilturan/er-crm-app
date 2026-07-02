@@ -14,7 +14,7 @@
 {#if totalReturned > 0}
 	<span
 		class="inline-flex items-center justify-center rounded px-2 py-0.5 text-[10px] font-bold {isFull
-			? 'bg-[#2a1a1a] text-[#ff4444]'
+			? 'bg-[color-mix(in_srgb,var(--hb-accent)_15%,transparent)] text-[var(--hb-accent)]'
 			: 'bg-[#2a1e0a] text-amber-400'}"
 	>
 		{totalReturned}/{totalQty} İade

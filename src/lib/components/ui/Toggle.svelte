@@ -10,12 +10,12 @@
 	} = $props();
 </script>
 
-<div class="inline-flex rounded-full bg-[#1a1a1a] border border-[#2a2a2a] p-0.5">
+<div class="inline-flex rounded-full bg-[var(--hb-track)] border border-[var(--hb-border)] p-0.5">
 	<button
 		type="button"
 		onclick={() => (value = true)}
 		class="px-3 py-1 rounded-full text-sm transition-colors
-			{value ? 'bg-white text-black font-medium' : 'text-[#888] hover:text-white'}"
+			{value ? 'bg-[var(--hb-active)] text-white font-medium' : 'text-[var(--hb-body)] hover:text-white'}"
 	>
 		{activeLabel}
 	</button>
@@ -23,7 +23,7 @@
 		type="button"
 		onclick={() => (value = false)}
 		class="px-3 py-1 rounded-full text-sm transition-colors
-			{!value ? 'bg-white text-black font-medium' : 'text-[#888] hover:text-white'}"
+			{!value ? 'bg-[var(--hb-active)] text-white font-medium' : 'text-[var(--hb-body)] hover:text-white'}"
 	>
 		{passiveLabel}
 	</button>

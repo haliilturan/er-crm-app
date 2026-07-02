@@ -8,7 +8,7 @@
 	} = $props();
 </script>
 
-<div class="bg-[#1a1a1a] rounded-xl p-3 border border-[#2a2a2a]">
-	<p class="text-xs text-[#888] mb-1">{label}</p>
+<div class="bg-[var(--hb-list)] rounded-lg p-3 border border-[var(--hb-border)]">
+	<p class="text-xs text-[var(--hb-body)] mb-1">{label}</p>
 	<p class="text-sm text-white">{value || '—'}</p>
 </div>

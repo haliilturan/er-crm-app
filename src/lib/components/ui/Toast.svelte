@@ -20,10 +20,10 @@
 	} = $props();
 </script>
 
-<div class="flex items-center bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl px-5 py-4 shadow-2xl w-full">
+<div class="flex items-center bg-[var(--hb-list)] border border-[var(--hb-border)] rounded-lg px-5 py-4 shadow-2xl w-full">
 	<div class="flex flex-col flex-1 min-w-0 gap-1">
 		{#if title}
-			<span class="text-[12px] font-bold text-[#555] leading-none">{title}</span>
+			<span class="text-[12px] font-bold text-[var(--hb-faint)] leading-none">{title}</span>
 		{/if}
 		<div class="flex items-center gap-2 text-sm text-white leading-none flex-wrap">
 			<span>{description}</span>
@@ -31,7 +31,7 @@
 				<button
 					type="button"
 					onclick={() => onlinkclick?.(link!)}
-					class="font-semibold underline hover:text-[#888] transition-colors"
+					class="font-semibold underline hover:text-[var(--hb-body)] transition-colors"
 				>
 					{linkText}
 				</button>
@@ -44,7 +44,7 @@
 			onclick={() => onclose?.(id)}
 			aria-label="Kapat"
 			class="flex items-center justify-center shrink-0 ml-4
-				text-[#555] hover:text-white transition-colors"
+				text-[var(--hb-faint)] hover:text-white transition-colors"
 		>
 			<svg class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
 				<path d="M18 6L6 18M6 6l12 12" />

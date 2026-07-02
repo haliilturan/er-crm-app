@@ -37,15 +37,15 @@
 		{disabled}
 		bind:value
 		onkeydown={(e) => e.key === 'Enter' && onsearch?.(value)}
-		class="w-full bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl pl-3 pr-9 py-2
-			text-white text-sm placeholder-[#555] outline-none transition-colors
-			focus:border-[#444] disabled:opacity-50 disabled:cursor-not-allowed"
+		class="w-full bg-[var(--hb-field)] border border-[var(--hb-border)] rounded-lg pl-3 pr-9 py-2
+			text-white text-sm placeholder-[var(--hb-faint)] outline-none transition-colors
+			focus:border-[var(--hb-highlight)] disabled:opacity-50 disabled:cursor-not-allowed"
 	/>
 	<button
 		type="button"
 		onclick={filled ? handleClear : () => inputEl?.focus()}
 		aria-label={filled ? 'Temizle' : 'Ara'}
-		class="absolute right-3 top-1/2 -translate-y-1/2 text-[#555] hover:text-[#888] transition-colors"
+		class="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--hb-faint)] hover:text-[var(--hb-body)] transition-colors"
 	>
 		{#if filled}
 			<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
