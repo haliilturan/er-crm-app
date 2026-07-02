@@ -7,6 +7,7 @@ export { default as Modal } from './Modal.svelte';
 export { default as NumberInput } from './NumberInput.svelte';
 export { default as ProgressBar } from './ProgressBar.svelte';
 export { default as SearchInput } from './SearchInput.svelte';
+export { default as SearchablePicker } from './SearchablePicker.svelte';
 export { default as SectionHead } from './SectionHead.svelte';
 export { default as Select } from './Select.svelte';
 export { default as Tabs } from './Tabs.svelte';
