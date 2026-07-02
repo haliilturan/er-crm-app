@@ -57,7 +57,7 @@
 	async function complete() {
 		completing = true;
 		try {
-			await db.transact([tx.tasks[taskId].update({ status: 'done' })]);
+			await db.transact([tx.tasks[taskId].update({ status: 'done', completedAt: Date.now() })]);
 			expanded = false;
 		} finally {
 			completing = false;
