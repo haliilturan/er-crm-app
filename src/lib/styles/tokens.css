@@ -2,6 +2,7 @@
    Değerler Cockpit'in scoped --ck-* değerleriyle BİREBİR aynıdır (renk tutarlılığı).
    Font zaten global TM Sans (layout.css). */
 :root {
+	--hb-bg: #101010;
 	--hb-panel: #181818;
 	--hb-surface: #1a1a1a;
 	--hb-track: #1b1b1b;

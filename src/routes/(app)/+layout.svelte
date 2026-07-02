@@ -219,16 +219,16 @@
 
 <!-- ─── Loading ────────────────────────────────────────────────────────────────── -->
 {#if !authStore.ready}
-	<div class="flex h-screen items-center justify-center bg-[#0a0a0a]">
+	<div class="flex h-screen items-center justify-center bg-[var(--hb-bg)]">
 		<div class="h-8 w-8 animate-spin rounded-full border-2 border-white border-t-transparent opacity-30"></div>
 	</div>
 
 <!-- ─── App shell ──────────────────────────────────────────────────────────────── -->
 {:else if authStore.userId}
-	<div class="flex h-screen flex-col overflow-hidden bg-[#0a0a0a]">
+	<div class="flex h-screen flex-col overflow-hidden bg-[var(--hb-bg)]">
 
 		<!-- ═══ Top Navbar ════════════════════════════════════════════════════════════ -->
-		<header class="flex h-12 shrink-0 items-center gap-3 border-b border-[#2a2a2a] bg-[#111111] px-4">
+		<header class="flex h-12 shrink-0 items-center gap-3 border-b border-[var(--hb-border)] bg-[var(--hb-panel)] px-4">
 
 			<!-- Logo + App name -->
 			<div class="flex shrink-0 items-center gap-2.5">
@@ -240,7 +240,7 @@
 				<span class="text-sm font-semibold text-white">ERP-CRM</span>
 			</div>
 
-			<div class="h-5 w-px shrink-0 bg-[#2a2a2a]"></div>
+			<div class="h-5 w-px shrink-0 bg-[var(--hb-border)]"></div>
 
 			<!-- Module tabs -->
 			<nav class="flex flex-1 items-center gap-0.5">
@@ -249,8 +249,8 @@
 						onclick={() => navigateToModule(mod)}
 						class="rounded-lg px-3 py-1.5 text-sm transition-colors
 							{activeModule?.id === mod.id
-								? 'bg-[#222] text-white font-medium'
-								: 'text-[#888] hover:text-white hover:bg-[#1a1a1a]'}"
+								? 'bg-[var(--hb-active)] text-white font-medium'
+								: 'text-[var(--hb-body)] hover:text-white hover:bg-[var(--hb-surface)]'}"
 					>
 						{mod.label}
 					</button>
@@ -264,19 +264,19 @@
 				<button
 					aria-label="Bildirimler"
 					onclick={() => chatBridge.openPulse()}
-					class="relative flex h-8 w-8 items-center justify-center rounded-lg text-[#555] transition-colors hover:bg-[#1a1a1a] hover:text-[#888]"
+					class="relative flex h-8 w-8 items-center justify-center rounded-lg text-[var(--hb-faint)] transition-colors hover:bg-[var(--hb-surface)] hover:text-[var(--hb-body)]"
 				>
 					<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 						<path d="M14.857 17.082a23.848 23.848 0 005.454-1.31A8.967 8.967 0 0118 9.75v-.7V9A6 6 0 006 9v.75a8.967 8.967 0 01-2.312 6.022c1.733.64 3.56 1.085 5.455 1.31m5.714 0a24.255 24.255 0 01-5.714 0m5.714 0a3 3 0 11-5.714 0" />
 					</svg>
 					{#if bellCount > 0}
-						<span class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-red-500 flex items-center justify-center text-[8px] font-bold text-white px-0.5">{bellCount > 9 ? '9+' : bellCount}</span>
+						<span class="absolute -top-0.5 -right-0.5 min-w-[14px] h-[14px] rounded-full bg-[var(--hb-accent)] flex items-center justify-center text-[8px] font-bold text-white px-0.5">{bellCount > 9 ? '9+' : bellCount}</span>
 					{/if}
 				</button>
 
 				<!-- User avatar -->
 				<div
-					class="flex h-8 w-8 items-center justify-center rounded-lg border border-[#2a2a2a] bg-[#222] text-xs font-medium text-[#888]"
+					class="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--hb-border)] bg-[var(--hb-muted)] text-xs font-medium text-[var(--hb-body)]"
 					title={authStore.userEmail ?? ''}
 				>
 					{initial(authStore.userEmail ?? 'U')}
@@ -286,7 +286,7 @@
 				<button
 					onclick={signOut}
 					title="Çıkış yap"
-					class="flex h-8 w-8 items-center justify-center rounded-lg text-[#555] transition-colors hover:bg-[#1a1a1a] hover:text-[#ff4444]"
+					class="flex h-8 w-8 items-center justify-center rounded-lg text-[var(--hb-faint)] transition-colors hover:bg-[var(--hb-surface)] hover:text-[var(--hb-accent)]"
 				>
 					<svg class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 						<path d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75" />
@@ -299,10 +299,10 @@
 		<div class="flex flex-1 overflow-hidden">
 
 			<!-- Left Sidebar -->
-			<aside class="flex w-56 shrink-0 flex-col border-r border-[#2a2a2a] bg-[#111111]">
+			<aside class="flex w-56 shrink-0 flex-col border-r border-[var(--hb-border)] bg-[var(--hb-panel)]">
 				{#if activeModule}
 					<div class="px-4 py-4">
-						<p class="text-xs font-semibold uppercase tracking-wider text-[#555]">
+						<p class="text-xs font-semibold uppercase tracking-wider text-[var(--hb-faint)]">
 							{activeModule.label}
 						</p>
 					</div>
@@ -312,8 +312,8 @@
 								href={navHref(subPage.href)}
 								class="flex items-center rounded-lg px-3 py-2 text-sm transition-colors
 									{page.url.pathname.startsWith(subPage.href)
-										? 'bg-[#222] text-white font-medium'
-										: 'text-[#888] hover:bg-[#1a1a1a] hover:text-white'}"
+										? 'bg-[var(--hb-active)] text-white font-medium'
+										: 'text-[var(--hb-body)] hover:bg-[var(--hb-surface)] hover:text-white'}"
 							>
 								{subPage.label}
 							</a>
@@ -323,12 +323,12 @@
 			</aside>
 
 			<!-- ═══ Main Content ═════════════════════════════════════════════════════════ -->
-			<main class="flex min-h-0 flex-1 flex-col overflow-hidden bg-[#0a0a0a]">
+			<main class="flex min-h-0 flex-1 flex-col overflow-hidden bg-[var(--hb-bg)]">
 				{@render children()}
 			</main>
 
 			<!-- ═══ Right Panel (Cockpit) ════════════════════════════════════════════════ -->
-			<aside class="flex w-80 shrink-0 flex-col overflow-hidden border-l border-[#2a2a2a] bg-[#111111]">
+			<aside class="flex w-80 shrink-0 flex-col overflow-hidden border-l border-[var(--hb-border)] bg-[var(--hb-panel)]">
 				<CockpitPanel />
 			</aside>
 		</div>
@@ -343,15 +343,15 @@
 							chatBridge.open(t.senderId);
 							layoutToasts = layoutToasts.filter((x) => x.id !== t.id);
 						}}
-						class="flex items-center gap-3 bg-[#1a1a1a] border border-[#2a2a2a] rounded-2xl px-4 py-3 shadow-2xl text-left w-full hover:bg-[#222] transition-colors"
+						class="flex items-center gap-3 bg-[var(--hb-list)] border border-[var(--hb-border)] rounded-lg px-4 py-3 shadow-2xl text-left w-full hover:bg-[var(--hb-list-hover)] transition-colors"
 					>
-						<div class="w-9 h-9 rounded-full bg-[#2a2a2a] border border-[#333] flex items-center justify-center text-sm font-bold text-white shrink-0">
+						<div class="w-9 h-9 rounded-full bg-[var(--hb-muted)] border border-[var(--hb-border)] flex items-center justify-center text-sm font-bold text-white shrink-0">
 							{t.inis}
 						</div>
 						<div class="flex-1 min-w-0">
-							<p class="text-xs text-[#888] mb-0.5">Yeni mesaj</p>
+							<p class="text-xs text-[var(--hb-body)] mb-0.5">Yeni mesaj</p>
 							<p class="text-sm text-white leading-snug truncate">
-								<span class="font-semibold">{t.name}</span><span class="text-[#888]">:&#32;{t.preview || '…'}</span>
+								<span class="font-semibold">{t.name}</span><span class="text-[var(--hb-body)]">:&#32;{t.preview || '…'}</span>
 							</p>
 						</div>
 					</button>
