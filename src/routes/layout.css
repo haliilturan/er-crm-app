@@ -32,3 +32,11 @@ html,
 body {
 	font-family: 'TM Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
+
+/* Odak halkasını hhboss tonuna çevir (kaldırma, yalnız renklendir) —
+   @tailwindcss/forms varsayılan mavisi yerine --hb-highlight. */
+input:focus,
+textarea:focus,
+select:focus {
+	--tw-ring-color: var(--hb-highlight);
+}
