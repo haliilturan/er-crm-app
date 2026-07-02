@@ -6,9 +6,11 @@
 	import SearchInput from './SearchInput.svelte';
 	import TextInput from './TextInput.svelte';
 	import TextArea from './TextArea.svelte';
-	import Select from './Select.svelte';
+	import SearchablePicker from './SearchablePicker.svelte';
 	import ToastGroup from './ToastGroup.svelte';
 	import { db, id, tx } from '$lib/instant';
+	import { isBusinessDay } from '$lib/utils/date';
+	import { normalize } from '$lib/utils/text';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { chatBridge } from '$lib/stores/chat.svelte';
 
@@ -158,7 +160,7 @@
 	});
 
 	// ─── Customers for task form ──────────────────────────────────────────────
-	let formCustomers = $state<Array<{ id: string; name: string }>>([]);
+	let formCustomers = $state<Array<{ id: string; name: string; updatedAt?: number; createdAt: number }>>([]);
 
 	$effect(() => {
 		const uid = authStore.userId;
@@ -167,9 +169,14 @@
 			{ customers: {} },
 			(res) => {
 				untrack(() => {
-					formCustomers = (res.data?.customers ?? []).map((c: { id: string; name?: string | null }) => ({
-						id: c.id, name: String(c.name ?? '')
-					}));
+					formCustomers = (res.data?.customers ?? []).map(
+						(c: { id: string; name?: string | null; updatedAt?: number | null; createdAt?: number | null }) => ({
+							id: c.id,
+							name: String(c.name ?? ''),
+							updatedAt: c.updatedAt ?? undefined,
+							createdAt: c.createdAt ?? 0
+						})
+					);
 				});
 			}
 		);
@@ -177,37 +184,27 @@
 
 	// ─── Task form state ─────────────────────────────────────────────────────
 	let newTask   = $state({ title: '', description: '', customerId: '', assignedTo: '' });
+	let customerQuery = $state('');
+	let assigneeQuery = $state('');
 	let saving    = $state(false);
 	let formError = $state('');
 	let toasts    = $state<Array<{ id: string; description: string; dismissible: boolean }>>([]);
 
 	async function saveTask() {
-		console.log('[saveTask] called');
 		const uid = authStore.userId;
-		if (!uid) {
-			console.log('[saveTask] no uid');
-			return;
-		}
+		if (!uid) return;
 
 		const cid = authStore.companyIds[0] ?? authStore.activeCompanyId;
 		if (!cid) {
-			console.log('[saveTask] no companyId — companies:', authStore.companies);
 			saving = false;
 			return;
 		}
 		if (!newTask.title.trim()) {
-			console.log('[saveTask] early exit — title empty');
 			formError = 'Başlık zorunludur.'; return;
 		}
 		saving = true; formError = '';
 		try {
 			const newId = id();
-			console.log('[saveTask] firing', JSON.stringify({
-				title:      newTask.title,
-				assignedTo: newTask.assignedTo,
-				companyId:  authStore.activeCompanyId,
-				uid:        authStore.userId
-			}));
 			await db.transact([
 				tx.tasks[newId].update({
 					title:      newTask.title.trim(),
@@ -227,6 +224,8 @@
 			]);
 			toasts = [...toasts, { id: String(Date.now()), description: 'Görev oluşturuldu ✓', dismissible: true }];
 			newTask = { title: '', description: '', customerId: '', assignedTo: '' };
+			customerQuery = '';
+			assigneeQuery = '';
 			taskSubTab = 'received';
 		} catch (err) {
 			console.error('saveTask error:', err);
@@ -243,7 +242,7 @@
 			const actorName = profileByUserId[authStore.userId ?? '']?.fullName ?? authStore.userEmail ?? '';
 
 			await db.transact([
-				tx.tasks[task.id].update({ status: 'done' }),
+				tx.tasks[task.id].update({ status: 'done', completedAt: now }),
 				tx.activityFeed[id()].merge({
 					type:              'task_completed',
 					companyId:         task.companyId ?? '',
@@ -306,6 +305,7 @@
 
 	// ─── Profiles for Chats ─────────────────────────────────────────────────
 	let allProfiles     = $state<UserProfile[]>([]);
+	let myProfile       = $state<UserProfile | null>(null);
 	let profilesLoading = $state(true);
 	let selectedChat    = $state<{ userId: string; profile: UserProfile } | null>(null);
 	let messages        = $state<Message[]>([]);
@@ -321,6 +321,7 @@
 			(res) => {
 				untrack(() => {
 					const all = (res.data?.userProfiles ?? []) as unknown as UserProfile[];
+					myProfile       = all.find((p) => p.userId === uid) ?? null;
 					allProfiles     = all.filter((p) => p.userId !== uid);
 					profilesLoading = false;
 				});
@@ -487,6 +488,65 @@
 	const customersById    = $derived(Object.fromEntries(formCustomers.map((c) => [c.id, c.name])));
 	const profileByUserId  = $derived(Object.fromEntries(allProfiles.map((p) => [p.userId, p])));
 
+	// ─── "Yeni görev" seçicileri (recent-3 + 3-harf arama) ────────────────────
+	type PickerItem = { value: string; label: string; sub?: string };
+
+	// Müşteri: ortak havuz, en son güncellenen 3 (updatedAt ?? createdAt) + client-side arama.
+	const recentCustomers = $derived<PickerItem[]>(
+		[...formCustomers]
+			.sort((a, b) => (b.updatedAt ?? b.createdAt) - (a.updatedAt ?? a.createdAt))
+			.slice(0, 3)
+			.map((c) => ({ value: c.id, label: c.name }))
+	);
+	const customerResults = $derived.by<PickerItem[]>(() => {
+		const q = normalize(customerQuery.trim());
+		if (q.length < 3) return [];
+		return formCustomers
+			.filter((c) => normalize(c.name).includes(q))
+			.slice(0, 8)
+			.map((c) => ({ value: c.id, label: c.name }));
+	});
+	const selectedCustomer = $derived.by<PickerItem | null>(() => {
+		if (!newTask.customerId) return null;
+		const c = formCustomers.find((x) => x.id === newTask.customerId);
+		return c ? { value: c.id, label: c.name } : null;
+	});
+
+	// Personel: self dahil (allProfiles'a dokunmadan myProfile eklenir).
+	const pickerProfiles        = $derived(myProfile ? [myProfile, ...allProfiles] : allProfiles);
+	const pickerProfileByUserId = $derived(
+		Object.fromEntries(pickerProfiles.filter((p) => p.userId).map((p) => [p.userId!, p]))
+	);
+	function profileItem(p: UserProfile | undefined, fallbackId: string): PickerItem {
+		return { value: p?.userId ?? fallbackId, label: p?.fullName ?? p?.email ?? 'Personel', sub: p?.email };
+	}
+	// En son görev atadığım 3 kişi (tasks createdAt desc; distinct assignedTo; self dahil).
+	const recentAssignees = $derived.by<PickerItem[]>(() => {
+		const uid = authStore.userId;
+		if (!uid) return [];
+		const seen: string[] = [];
+		const out: PickerItem[] = [];
+		for (const t of tasks) {
+			if (t.createdBy !== uid || !t.assignedTo || seen.includes(t.assignedTo)) continue;
+			seen.push(t.assignedTo);
+			out.push(profileItem(pickerProfileByUserId[t.assignedTo], t.assignedTo));
+			if (out.length === 3) break;
+		}
+		return out;
+	});
+	const assigneeResults = $derived.by<PickerItem[]>(() => {
+		const q = normalize(assigneeQuery.trim());
+		if (q.length < 3) return [];
+		return pickerProfiles
+			.filter((p) => normalize(p.fullName ?? '').includes(q) || normalize(p.email ?? '').includes(q))
+			.slice(0, 8)
+			.map((p) => profileItem(p, p.id));
+	});
+	const selectedAssignee = $derived.by<PickerItem | null>(() => {
+		if (!newTask.assignedTo) return null;
+		return profileItem(pickerProfileByUserId[newTask.assignedTo], newTask.assignedTo);
+	});
+
 	const receivedDayTasks = $derived.by(() => {
 		const uid = authStore.userId;
 		return tasks.filter((t) => {
@@ -499,19 +559,23 @@
 				return toLocalDateStr(new Date(t.dueAt)) === activeDay;
 			}
 
-			// Normal görev: başkasından atanmış olmalı
-			if (t.assignedTo !== uid || t.createdBy === uid) return false;
-			if (!t.dueAt) return true;
-			return toLocalDateStr(new Date(t.dueAt)) === activeDay;
+			// Bana atanmış görev (kim oluşturursa oluştursun, self dahil); createdAt
+			// gününden bugüne kadar HER İŞ GÜNÜ görünür (carry-forward), yapılana kadar.
+			if (t.assignedTo !== uid) return false;
+			if (!isBusinessDay(activeDateObj)) return false; // Cmt/Paz gösterme
+			if (activeDay > TODAY_STR) return false;         // gelecek gün gösterme
+			return toLocalDateStr(new Date(t.createdAt)) <= activeDay;
 		});
 	});
 
 	const sentDayTasks = $derived.by(() => {
 		const uid = authStore.userId;
 		return tasks.filter((t) => {
-			if (t.createdBy !== uid || t.assignedTo === uid) return false;
-			if (!t.dueAt) return true;
-			return toLocalDateStr(new Date(t.dueAt)) === activeDay;
+			if (t.status === 'done' || t.status === 'dismissed') return false; // yapılana kadar
+			if (t.createdBy !== uid || t.assignedTo === uid) return false;     // başkasına gönderdiğim
+			if (!isBusinessDay(activeDateObj)) return false;                   // Cmt/Paz gizle
+			if (activeDay > TODAY_STR) return false;                           // gelecek gizle
+			return toLocalDateStr(new Date(t.createdAt)) <= activeDay;         // createdAt'ten bugüne
 		});
 	});
 
@@ -571,17 +635,17 @@
 	);
 </script>
 
-<div class="relative flex flex-col h-full overflow-hidden bg-[#111111]">
+<div class="cockpit-skin relative flex flex-col h-full overflow-hidden bg-[var(--ck-panel)]">
 
 	<!-- ═══ TOP BAR ═══════════════════════════════════════════════════════════ -->
 	<div class="shrink-0 flex items-center justify-between px-4 pt-4 pb-3">
 		<!-- Tabs -->
-		<div class="flex gap-0.5 bg-[#1a1a1a] rounded-full p-0.5">
+		<div class="flex gap-0.5 bg-[var(--ck-track)] rounded-full p-0.5">
 			<button
 				type="button"
 				onclick={() => (activeTab = 'tasks')}
 				class="relative px-3 py-1 rounded-full text-xs font-medium transition-colors
-					{activeTab === 'tasks' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+					{activeTab === 'tasks' ? 'bg-[var(--ck-active)] text-white' : 'text-[var(--ck-body)] hover:text-white'}"
 			>
 				Görevler
 			</button>
@@ -589,7 +653,7 @@
 				type="button"
 				onclick={() => (activeTab = 'chats')}
 				class="relative px-3 py-1 rounded-full text-xs font-medium transition-colors
-					{activeTab === 'chats' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+					{activeTab === 'chats' ? 'bg-[var(--ck-active)] text-white' : 'text-[var(--ck-body)] hover:text-white'}"
 			>
 				Mesajlar
 				{#if unreadCount > 0}
@@ -600,7 +664,7 @@
 				type="button"
 				onclick={() => (activeTab = 'pulse')}
 				class="px-3 py-1 rounded-full text-xs font-medium transition-colors
-					{activeTab === 'pulse' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+					{activeTab === 'pulse' ? 'bg-[var(--ck-active)] text-white' : 'text-[var(--ck-body)] hover:text-white'}"
 			>
 				Pulse
 			</button>
@@ -612,7 +676,7 @@
 			aria-label="Ayarlar"
 			onclick={() => (showSettings = !showSettings)}
 			class="w-8 h-8 rounded-full border flex items-center justify-center transition-colors
-				{showSettings ? 'bg-white border-white text-black' : 'bg-[#222] border-[#2a2a2a] text-[#666] hover:text-white'}"
+				{showSettings ? 'bg-[var(--ck-active)] border-[var(--ck-active)] text-white' : 'bg-[var(--ck-muted)] border-[var(--ck-border)] text-[var(--ck-body)] hover:text-white'}"
 		>
 			<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 				<path d="M20 21v-2a4 4 0 00-4-4H8a4 4 0 00-4 4v2"/><circle cx="12" cy="7" r="4"/>
@@ -633,18 +697,18 @@
 			<!-- Theme -->
 			<div class="mb-5">
 				<p class="text-[10px] font-semibold text-[#444] uppercase tracking-wider mb-2">Change app theme</p>
-				<div class="flex gap-0.5 bg-[#1a1a1a] rounded-full p-0.5">
+				<div class="flex gap-0.5 bg-[var(--ck-track)] rounded-full p-0.5">
 					<button
 						type="button"
 						onclick={() => setTheme('dark')}
 						class="flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
-							{theme === 'dark' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+							{theme === 'dark' ? 'bg-[var(--ck-active)] text-white' : 'text-[var(--ck-body)] hover:text-white'}"
 					>Dark Theme</button>
 					<button
 						type="button"
 						onclick={() => setTheme('light')}
 						class="flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
-							{theme === 'light' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+							{theme === 'light' ? 'bg-[var(--ck-active)] text-white' : 'text-[var(--ck-body)] hover:text-white'}"
 					>Light Theme</button>
 				</div>
 			</div>
@@ -652,18 +716,18 @@
 			<!-- Language -->
 			<div class="mb-5">
 				<p class="text-[10px] font-semibold text-[#444] uppercase tracking-wider mb-2">Change app language</p>
-				<div class="flex gap-0.5 bg-[#1a1a1a] rounded-full p-0.5">
+				<div class="flex gap-0.5 bg-[var(--ck-track)] rounded-full p-0.5">
 					<button
 						type="button"
 						onclick={() => setLang('en')}
 						class="flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
-							{lang === 'en' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+							{lang === 'en' ? 'bg-[var(--ck-active)] text-white' : 'text-[var(--ck-body)] hover:text-white'}"
 					>English</button>
 					<button
 						type="button"
 						onclick={() => setLang('tr')}
 						class="flex-1 py-1.5 rounded-full text-xs font-medium transition-colors
-							{lang === 'tr' ? 'bg-white text-black' : 'text-[#666] hover:text-white'}"
+							{lang === 'tr' ? 'bg-[var(--ck-active)] text-white' : 'text-[var(--ck-body)] hover:text-white'}"
 					>Türkçe</button>
 				</div>
 			</div>
@@ -675,12 +739,12 @@
 					<button
 						type="button"
 						onclick={signOut}
-						class="flex-1 py-2 rounded-full text-xs font-medium bg-[#1a1a1a] border border-[#2a2a2a] text-[#888] hover:bg-[#222] hover:text-white transition-colors"
+						class="flex-1 py-2 rounded-full text-xs font-medium bg-[var(--ck-muted)] border border-[var(--ck-border)] text-[var(--ck-body)] hover:bg-[var(--ck-hover)] hover:text-white transition-colors"
 					>Logout</button>
 					<button
 						type="button"
 						onclick={signOut}
-						class="flex-1 py-2 rounded-full text-xs font-medium bg-[#1a1a1a] border border-[#2a2a2a] text-[#888] hover:bg-[#222] hover:text-white transition-colors"
+						class="flex-1 py-2 rounded-full text-xs font-medium bg-[var(--ck-muted)] border border-[var(--ck-border)] text-[var(--ck-body)] hover:bg-[var(--ck-hover)] hover:text-white transition-colors"
 					>Change User</button>
 				</div>
 			</div>
@@ -708,7 +772,7 @@
 					type="button"
 					onclick={() => weekOffset--}
 					aria-label="Önceki hafta"
-					class="shrink-0 w-7 h-7 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[#555] hover:text-white transition-colors"
+					class="shrink-0 w-7 h-7 rounded-full bg-[var(--ck-surface)] border border-[var(--ck-border)] flex items-center justify-center text-[var(--ck-body)] hover:text-white transition-colors"
 				>
 					<ChevronLeft size={14} />
 				</button>
@@ -722,16 +786,15 @@
 						<button
 							type="button"
 							onclick={() => selectDay(day.key)}
-							class="flex-1 flex flex-col items-center gap-1 py-2 rounded-xl transition-colors
-								{isActive ? 'bg-white' : isT ? 'bg-[#222] border border-[#333]' : 'bg-[#1a1a1a] hover:bg-[#222]'}"
+							class="flex-1 flex flex-col items-center gap-1 py-2 rounded-lg transition-colors
+								{isActive ? 'bg-[var(--ck-active)]' : isT ? 'bg-[var(--ck-muted)] border border-[var(--ck-border)]' : 'bg-[var(--ck-surface)] hover:bg-[var(--ck-muted)]'}"
 						>
 							<span class="text-[9px] font-medium uppercase
-								{isActive ? 'text-[#777]' : 'text-[#444]'}">{day.label}</span>
-							<span class="text-sm font-semibold leading-none
-								{isActive ? 'text-black' : 'text-white'}">{day.date}</span>
+								{isActive ? 'text-white' : 'text-[var(--ck-faint)]'}">{day.label}</span>
+							<span class="text-sm font-semibold leading-none text-white">{day.date}</span>
 							<!-- Task dot -->
 							{#if hasTasks && !isActive}
-								<span class="w-1 h-1 rounded-full bg-blue-500"></span>
+								<span class="w-1 h-1 rounded-full bg-[var(--ck-body)]"></span>
 							{:else}
 								<span class="w-1 h-1"></span>
 							{/if}
@@ -744,7 +807,7 @@
 					type="button"
 					onclick={() => weekOffset++}
 					aria-label="Sonraki hafta"
-					class="shrink-0 w-7 h-7 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[#555] hover:text-white transition-colors"
+					class="shrink-0 w-7 h-7 rounded-full bg-[var(--ck-surface)] border border-[var(--ck-border)] flex items-center justify-center text-[var(--ck-body)] hover:text-white transition-colors"
 				>
 					<ChevronRight size={14} />
 				</button>
@@ -754,13 +817,13 @@
 			<p class="text-xs text-[#444] mb-3">{fmtActiveDay(activeDay)}</p>
 
 			<!-- ── Sub tabs ──────────────────────────────────────────────── -->
-			<div class="flex gap-0.5 mb-3 bg-[#1a1a1a] rounded-full p-0.5">
+			<div class="flex gap-0.5 mb-3 bg-[var(--ck-track)] rounded-full p-0.5">
 				{#each (['received', 'sent', 'new'] as const) as sub (sub)}
 					<button
 						type="button"
 						onclick={() => { taskSubTab = sub; if (sub !== 'new') formError = ''; }}
 						class="relative flex-1 py-1 rounded-full text-xs font-medium transition-colors
-							{taskSubTab === sub ? 'bg-white text-black' : 'text-[#555] hover:text-white'}"
+							{taskSubTab === sub ? 'bg-[var(--ck-active)] text-white' : 'text-[var(--ck-body)] hover:text-white'}"
 					>
 						{sub === 'received' ? 'Alınan' : sub === 'sent' ? 'Gönderilenler' : 'Yeni'}
 					</button>
@@ -769,35 +832,47 @@
 
 			<!-- ── New task form ─────────────────────────────────────────── -->
 			{#if taskSubTab === 'new'}
-				<div class="bg-[#1a1a1a] rounded-2xl p-4 flex flex-col gap-3 border border-[#2a2a2a]">
+				<div class="bg-[var(--ck-surface)] rounded-lg p-4 flex flex-col gap-3 border border-[var(--ck-border)]">
 					<p class="text-xs text-[#555]">Son tarih: <span class="text-[#777]">{fmtActiveDay(activeDay)}</span></p>
 					<TextInput label="Başlık" bind:value={newTask.title} placeholder="Görev başlığı" required />
 					<TextArea  label="Açıklama" bind:value={newTask.description} placeholder="Opsiyonel..." rows={2} />
-					<Select
-						label="İlgili Müşteri"
-						bind:value={newTask.customerId}
-						options={formCustomers.map((c) => ({ value: c.id, label: c.name }))}
-						placeholder="Müşteri seçin (opsiyonel)"
+					<SearchablePicker
+						label="İlgili Müşteri (opsiyonel)"
+						placeholder="Müşteri ara..."
+						recentLabel="Son güncellenenler"
+						emptyText="Müşteri bulunamadı"
+						bind:query={customerQuery}
+						recent={recentCustomers}
+						results={customerResults}
+						selected={selectedCustomer}
+						onselect={(v) => (newTask.customerId = v)}
+						onclear={() => (newTask.customerId = '')}
 					/>
-					<Select
+					<SearchablePicker
 						label="Atanacak Personel"
-						bind:value={newTask.assignedTo}
-						options={allProfiles.map((p) => ({ value: p.userId ?? p.id, label: p.fullName ?? p.email ?? 'Personel' }))}
-						placeholder="Bana ata (varsayılan)"
+						placeholder="Personel ara..."
+						recentLabel="Son atadıkların"
+						emptyText="Personel bulunamadı"
+						bind:query={assigneeQuery}
+						recent={recentAssignees}
+						results={assigneeResults}
+						selected={selectedAssignee}
+						onselect={(v) => (newTask.assignedTo = v)}
+						onclear={() => (newTask.assignedTo = '')}
 					/>
 					{#if formError}<p class="text-xs text-red-400">{formError}</p>{/if}
 					<div class="flex gap-2 pt-1">
 						<button
 							type="button"
 							onclick={() => { taskSubTab = 'received'; formError = ''; }}
-							class="flex-1 bg-[#222] text-white rounded-full px-4 py-2 text-xs transition-colors hover:bg-[#2a2a2a]"
+							class="flex-1 bg-[var(--ck-muted)] text-[var(--ck-body)] rounded-full px-4 py-2 text-xs transition-colors hover:bg-[var(--ck-hover)] hover:text-white"
 						>İptal</button>
 						<button
 							type="button"
 							onclick={saveTask}
 							disabled={saving}
 							style={saving ? 'pointer-events: none' : ''}
-							class="flex-1 bg-white text-black rounded-full px-4 py-2 text-xs font-medium transition-opacity disabled:opacity-50"
+							class="flex-1 bg-[var(--ck-active)] text-white rounded-full px-4 py-2 text-xs font-medium transition-opacity disabled:opacity-50"
 						>{saving ? 'Kaydediliyor...' : 'Kaydet'}</button>
 					</div>
 				</div>
@@ -817,8 +892,8 @@
 							{@const q       = ordersMap[task.orderId!]}
 							{@const days    = daysSince(task.createdAt)}
 							{@const overdue = days >= 7}
-							<div class="rounded-2xl border px-3 py-3 bg-[#1a1a1a] transition-colors
-								{overdue ? 'border-red-900/40' : 'border-[#222]'}">
+							<div class="rounded-lg border px-3 py-3 bg-[var(--ck-list)] transition-colors
+								{overdue ? 'border-[var(--ck-accent)]/40' : 'border-[var(--ck-border)]'}">
 								<div class="flex items-start justify-between gap-2">
 									<div class="min-w-0 flex-1">
 										<p class="text-sm font-semibold text-white leading-tight truncate">
@@ -851,26 +926,20 @@
 				<div class="flex flex-col gap-2">
 					{#if tasksLoading}
 						{#each [1, 2, 3] as _k (_k)}
-							<div class="h-14 rounded-2xl bg-[#1a1a1a] animate-pulse"></div>
+							<div class="h-14 rounded-lg bg-[var(--ck-list)] animate-pulse"></div>
 						{/each}
 					{:else if currentTabTasks.length === 0}
-						<div class="flex flex-col items-center gap-2 py-8 text-[#444]">
-							<svg class="w-8 h-8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-								<path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>
-							</svg>
-							<p class="text-xs">Bu gün için görev yok</p>
-						</div>
+						<p class="text-center text-[var(--ck-faint)] text-xs py-6">Bu gün için görev yok</p>
 					{:else}
 						{#each currentTabTasks as task (task.id)}
 							{@const st         = taskStatus(task)}
 							{@const isDone     = st === 'done'}
 							{@const isExpanded = expandedId === task.id}
-							{@const initial    = (task.title ?? '?').trim().slice(0, 1).toUpperCase()}
 							<div
-								class="rounded-2xl border transition-all cursor-pointer
+								class="rounded-lg transition-all cursor-pointer
 									{isDone
-										? 'bg-green-950/40 border-green-900/30'
-										: 'bg-[#1a1a1a] border-[#222] hover:border-[#2a2a2a]'}"
+										? 'bg-[var(--ck-list)] opacity-50'
+										: 'bg-[var(--ck-list)] hover:bg-[var(--ck-list-hover)]'}"
 								role="button"
 								tabindex="0"
 								onclick={() => (expandedId = isExpanded ? null : task.id)}
@@ -880,19 +949,15 @@
 									<!-- Left indicator -->
 									<div class="shrink-0 mt-0.5">
 										{#if isDone}
-											<div class="w-8 h-8 rounded-full bg-green-900/60 flex items-center justify-center">
-												<svg class="w-4 h-4 text-green-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+											<div class="w-8 h-8 rounded-full bg-[var(--ck-muted)] flex items-center justify-center">
+												<svg class="w-4 h-4 text-[var(--ck-body)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
 													<path d="M5 13l4 4L19 7"/>
 												</svg>
 											</div>
 										{:else if st === 'overdue'}
-											<div class="w-8 h-8 rounded-full bg-orange-900/40 border border-orange-700/40 flex items-center justify-center text-xs font-bold text-orange-400">
-												{initial}
-											</div>
+											<div class="w-8 h-8 rounded-full border-2 border-dashed border-[var(--ck-accent)]"></div>
 										{:else}
-											<div class="w-8 h-8 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-xs font-bold text-[#666]">
-												{initial}
-											</div>
+											<div class="w-8 h-8 rounded-full border-2 border-[var(--ck-highlight)]"></div>
 										{/if}
 									</div>
 
@@ -901,7 +966,7 @@
 										<!-- Title row -->
 										<div class="flex items-start justify-between gap-2">
 											<p class="text-sm font-medium leading-tight
-												{isDone ? 'line-through text-green-400/50' : st === 'overdue' ? 'text-orange-300' : 'text-white'}">
+												{isDone ? 'line-through text-[var(--ck-body)]' : 'text-white'}">
 												{task.title ?? '(Başlıksız)'}
 											</p>
 											<span class="text-[10px] text-[#444] shrink-0 whitespace-nowrap mt-px">
@@ -953,7 +1018,7 @@
 													<button
 														type="button"
 														onclick={() => (expandedId = null)}
-														class="px-2.5 py-1 rounded-full border border-[#2a2a2a] text-[10px] text-[#666] hover:text-white hover:border-[#444] transition-colors"
+														class="px-2.5 py-1 rounded-full border border-[var(--ck-border)] text-[10px] text-[var(--ck-body)] hover:text-white hover:border-[var(--ck-highlight)] transition-colors"
 													>Kapat</button>
 
 													<!-- Complete -->
@@ -961,14 +1026,14 @@
 														type="button"
 														onclick={() => completeTask(task)}
 														disabled={completing === task.id}
-														class="px-2.5 py-1 rounded-full border border-green-800/50 text-[10px] text-green-400 hover:bg-green-900/30 hover:border-green-700 transition-colors disabled:opacity-40 disabled:pointer-events-none"
+														class="px-2.5 py-1 rounded-full bg-[var(--ck-active)] text-[10px] text-white hover:bg-[var(--ck-hover)] transition-colors disabled:opacity-40 disabled:pointer-events-none"
 													>{completing === task.id ? '…' : 'Tamamlandı'}</button>
 
 													<!-- Message icon -->
 													<button
 														type="button"
 														aria-label="Mesaj gönder"
-														class="w-6 h-6 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-[#555] hover:text-white transition-colors"
+														class="w-6 h-6 rounded-full bg-[var(--ck-muted)] border border-[var(--ck-border)] flex items-center justify-center text-[var(--ck-body)] hover:text-white transition-colors"
 													>
 														<MessageCircle size={11} />
 													</button>
@@ -980,7 +1045,7 @@
 															aria-label="Teklif linkini kopyala"
 															title="Teklif linkini kopyala"
 															onclick={() => teklifLinkiKopyala(task.orderId!)}
-															class="w-6 h-6 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-[#555] hover:text-white transition-colors"
+															class="w-6 h-6 rounded-full bg-[var(--ck-muted)] border border-[var(--ck-border)] flex items-center justify-center text-[var(--ck-body)] hover:text-white transition-colors"
 														>
 															<Share2 size={11} />
 														</button>
@@ -1004,7 +1069,7 @@
 						<div class="mt-4">
 							{#each takipGorevleri as gorev (gorev.id)}
 								{@const q = ordersMap[gorev.orderId!]}
-								<div class="flex items-center justify-between rounded-lg border border-orange-900/40 bg-[#1a1a1a] px-4 py-3 mb-2">
+								<div class="flex items-center justify-between rounded-lg border border-orange-900/40 bg-[var(--ck-list)] px-4 py-3 mb-2">
 									<div class="min-w-0 flex-1">
 										<p class="text-sm font-medium text-white truncate">{gorev.title}</p>
 										<p class="text-xs text-[#666]">{q?.customer?.name ?? ''}</p>
@@ -1031,11 +1096,11 @@
 					<button
 						type="button"
 						onclick={() => { selectedChat = null; messageInput = ''; }}
-						class="w-7 h-7 rounded-full bg-[#1a1a1a] border border-[#2a2a2a] flex items-center justify-center text-[#555] hover:text-white transition-colors shrink-0"
+						class="w-7 h-7 rounded-full bg-[var(--ck-surface)] border border-[var(--ck-border)] flex items-center justify-center text-[var(--ck-body)] hover:text-white transition-colors shrink-0"
 					>
 						<ChevronLeft size={14} />
 					</button>
-					<div class="w-8 h-8 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-xs font-bold text-white shrink-0">
+					<div class="w-8 h-8 rounded-full bg-[var(--ck-muted)] border border-[var(--ck-border)] flex items-center justify-center text-xs font-bold text-white shrink-0">
 						{initials(selectedChat?.profile)}
 					</div>
 					<div class="min-w-0">
@@ -1054,7 +1119,7 @@
 				>
 					{#if messagesLoading}
 						{#each [1, 2, 3] as _k, i (_k)}
-							<div class="h-8 rounded-2xl bg-[#1a1a1a] animate-pulse {i % 2 === 0 ? 'w-2/3 self-end' : 'w-1/2 self-start'}"></div>
+							<div class="h-8 rounded-lg bg-[var(--ck-list)] animate-pulse {i % 2 === 0 ? 'w-2/3 self-end' : 'w-1/2 self-start'}"></div>
 						{/each}
 					{:else if messages.length === 0}
 						<div class="flex flex-col items-center gap-2 py-8 text-[#333]">
@@ -1068,13 +1133,13 @@
 							{@const isMe = msg.senderId === authStore.userId}
 							<div class="flex {isMe ? 'justify-end' : 'justify-start'}">
 								<div class="max-w-[78%] px-3 py-2 rounded-2xl {isMe
-									? 'bg-white text-black rounded-br-md'
-									: 'bg-[#1e1e1e] text-white border border-[#252525] rounded-bl-md'}">
+									? 'bg-[var(--ck-active)] text-white rounded-br-md'
+									: 'bg-[var(--ck-list)] text-white border border-[var(--ck-border)] rounded-bl-md'}">
 									<p class="text-xs leading-relaxed wrap-break-word">{msg.content}</p>
-									<p class="text-[9px] mt-0.5 {isMe ? 'text-black/40' : 'text-[#444]'} text-right flex items-center justify-end gap-0.5">
+									<p class="text-[9px] mt-0.5 {isMe ? 'text-white/40' : 'text-[var(--ck-faint)]'} text-right flex items-center justify-end gap-0.5">
 										<span>{fmtMsgTime(msg.createdAt)}</span>
 										{#if isMe}
-											<span class="{msg.readAt ? 'text-blue-500' : 'text-black/30'}">{msg.readAt ? '✓✓' : '✓'}</span>
+											<span class="{msg.readAt ? 'text-blue-500' : 'text-white/30'}">{msg.readAt ? '✓✓' : '✓'}</span>
 										{/if}
 									</p>
 								</div>
@@ -1089,14 +1154,14 @@
 						bind:value={messageInput}
 						onkeydown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); } }}
 						placeholder="Mesaj yaz..."
-						class="flex-1 bg-[#1a1a1a] border border-[#2a2a2a] rounded-full px-4 py-2 text-xs text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[#333] transition-colors"
+						class="flex-1 bg-[var(--ck-surface)] border border-[var(--ck-border)] rounded-full px-4 py-2 text-xs text-white placeholder-[#3a3a3a] focus:outline-none focus:border-[var(--ck-highlight)] transition-colors"
 					/>
 					<button
 						type="button"
 						aria-label="Gönder"
 						onclick={sendMessage}
 						disabled={!messageInput.trim()}
-						class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-black disabled:opacity-25 transition-opacity shrink-0"
+						class="w-8 h-8 rounded-full bg-[var(--ck-active)] flex items-center justify-center text-white disabled:opacity-25 transition-opacity shrink-0"
 					>
 						<svg class="w-3.5 h-3.5 -mr-px" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
 							<path d="M22 2L11 13"/><path d="M22 2L15 22 11 13 2 9l20-7z"/>
@@ -1118,7 +1183,7 @@
 
 				{#if profilesLoading}
 					{#each [1, 2, 3] as _k (_k)}
-						<div class="h-14 rounded-2xl bg-[#1a1a1a] animate-pulse mb-2"></div>
+						<div class="h-14 rounded-lg bg-[var(--ck-list)] animate-pulse mb-2"></div>
 					{/each}
 				{:else if filteredProfiles.length === 0}
 					<div class="flex flex-col items-center gap-2 py-8 text-[#444]">
@@ -1135,9 +1200,9 @@
 							<button
 								type="button"
 								onclick={() => (selectedChat = { userId: profile.userId!, profile })}
-								class="flex items-center gap-3 w-full rounded-2xl bg-[#1a1a1a] border border-[#222] px-3 py-3 text-left transition-colors hover:bg-[#202020] hover:border-[#2a2a2a]"
+								class="flex items-center gap-3 w-full rounded-lg bg-[var(--ck-list)] border border-[var(--ck-border)] px-3 py-3 text-left transition-colors hover:bg-[var(--ck-list-hover)]"
 							>
-								<div class="w-9 h-9 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-sm font-bold text-white shrink-0">
+								<div class="w-9 h-9 rounded-full bg-[var(--ck-muted)] border border-[var(--ck-border)] flex items-center justify-center text-sm font-bold text-white shrink-0">
 									{initials(profile)}
 								</div>
 								<div class="flex-1 min-w-0">
@@ -1172,7 +1237,7 @@
 			<div class="flex flex-col gap-2">
 				{#if activitiesLoading}
 					{#each [1, 2, 3] as _k (_k)}
-						<div class="h-16 rounded-2xl bg-[#1a1a1a] animate-pulse"></div>
+						<div class="h-16 rounded-lg bg-[var(--ck-list)] animate-pulse"></div>
 					{/each}
 				{:else if activities.length === 0}
 					<div class="flex flex-col items-center gap-2 py-8 text-[#444]">
@@ -1183,8 +1248,8 @@
 					</div>
 				{:else}
 					{#each activities as act (act.id)}
-						<div class="bg-[#1a1a1a] rounded-2xl border border-[#1e1e1e] px-4 py-3 flex items-start gap-3">
-							<div class="w-8 h-8 rounded-full bg-[#222] border border-[#2a2a2a] flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5">
+						<div class="bg-[var(--ck-list)] rounded-lg border border-[var(--ck-border)] px-4 py-3 flex items-start gap-3">
+							<div class="w-8 h-8 rounded-full bg-[var(--ck-muted)] border border-[var(--ck-border)] flex items-center justify-center text-xs font-bold text-white shrink-0 mt-0.5">
 								{(act.actorName ?? '?').split(' ').map((w: string) => w[0] ?? '').slice(0, 2).join('').toUpperCase()}
 							</div>
 							<div class="flex-1 min-w-0">
@@ -1216,3 +1281,23 @@
 		onclose={(tid) => (toasts = toasts.filter((t) => t.id !== tid))}
 	/>
 </div>
+
+<style>
+	/* hhboss görsel dili — YALNIZ Cockpit köküne scoped (global/:root'a yazılmaz). */
+	.cockpit-skin {
+		--ck-panel: #181818;
+		--ck-surface: #1a1a1a;
+		--ck-track: #1b1b1b;
+		--ck-active: #2c2c2e;
+		--ck-list: #1e1e1e;
+		--ck-list-hover: #2c2c2e;
+		--ck-muted: #242426;
+		--ck-hover: #333335;
+		--ck-highlight: #48484a;
+		--ck-border: #252525;
+		--ck-field: #121212;
+		--ck-body: #727274;
+		--ck-faint: #545456;
+		--ck-accent: #ff3b30;
+	}
+</style>
