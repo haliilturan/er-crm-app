@@ -2,6 +2,7 @@
 	import { untrack } from 'svelte';
 	import { SvelteDate } from 'svelte/reactivity';
 	import { db } from '$lib/instant';
+	import { nthBusinessDay } from '$lib/utils/date';
 	import { authStore } from '$lib/stores/auth.svelte';
 	import { Tabs, ListItemCard, SearchInput } from '$lib/components/ui';
 
@@ -62,11 +63,32 @@
 		items?: OrderLineItem[];
 	};
 
-	type FeedItem = (TaskItem | OrderItem) & { _kind: 'task' | 'order' };
+	type OverdueItem = {
+		id: string;
+		_kind: 'overdue';
+		createdAt: number;
+		assignedTo: string;
+		title: string;
+	};
+
+	type CompletedItem = {
+		id: string;
+		_kind: 'completed';
+		createdAt: number;
+		actorId: string;
+		actorName: string;
+		description: string;
+	};
+
+	type FeedItem =
+		| ((TaskItem | OrderItem) & { _kind: 'task' | 'order' })
+		| OverdueItem
+		| CompletedItem;
 
 	// ── State ──────────────────────────────────────────────────────────────────
 
 	let tasks    = $state<TaskItem[]>([]);
+	let completedEvents = $state<{ id: string; actorId: string; actorName: string; description: string; createdAt: number }[]>([]);
 	let orders   = $state<OrderItem[]>([]);
 	let userList = $state<{ userId: string; role: string; profile: Profile }[]>([]);
 	let loading  = $state(true);
@@ -176,8 +198,40 @@
 				.forEach(o => items.push({ ...o, _kind: 'order' as const }));
 		} else {
 			tasks
-				.filter(t => matchesDate(t.createdAt) && matchesUser(t.assignedTo))
+				.filter(t => t.status !== 'done' && matchesDate(t.completedAt ?? t.createdAt) && matchesUser(t.assignedTo))
 				.forEach(t => items.push({ ...t, _kind: 'task' as const }));
+
+			// Tamamlanan görev olayları — activityFeed (Pulse ile aynı kayıtlar).
+			// Done kartı yerine "X ... tamamladı" olay satırı.
+			completedEvents
+				.filter(a => matchesDate(a.createdAt) && matchesUser(a.actorId))
+				.forEach(a => items.push({
+					id:          'completed-' + a.id,
+					_kind:       'completed' as const,
+					createdAt:   a.createdAt,
+					actorId:     a.actorId,
+					actorName:   a.actorName,
+					description: a.description
+				}));
+
+			// Gecikme bildirimi: 8. iş gününde hâlâ pending görev için sentetik satır.
+			// Canlı türetme (yazma yok); gelecek gün tahmini üretilmez.
+			const todayKey = dateKey(todayLocal());
+			tasks
+				.filter(t => t.status === 'pending' && matchesUser(t.assignedTo))
+				.forEach(t => {
+					const oDay = nthBusinessDay(t.createdAt, 8);
+					const oKey = dateKey(oDay);
+					if (oKey === selectedDate && oKey <= todayKey) {
+						items.push({
+							id:         'overdue-' + t.id,
+							_kind:      'overdue' as const,
+							createdAt:  oDay.getTime(),
+							assignedTo: t.assignedTo,
+							title:      t.title
+						});
+					}
+				});
 		}
 
 		const sorted = items.sort((a, b) => b.createdAt - a.createdAt);
@@ -207,6 +261,9 @@
 				userCompanies: {
 					$: { where: { companyId: { in: cIds } } },
 					profile: {}
+				},
+				activityFeed: {
+					$: { where: { type: 'task_completed', companyId: { in: cIds } }, order: { createdAt: 'desc' } }
 				}
 			},
 			(result) => {
@@ -225,6 +282,13 @@
 						.filter(u => !!u.profile)
 						.map(u => ({ userId: u.userId, role: u.role, profile: u.profile! }));
 					userList = [...new Map(rawUsers.map(u => [u.userId, u])).values()];
+
+					const rawActs = (result.data?.activityFeed ?? []) as {
+						id: string; actorId: string; actorName: string; description?: string; createdAt: number;
+					}[];
+					completedEvents = rawActs.map(a => ({
+						id: a.id, actorId: a.actorId, actorName: a.actorName, description: a.description ?? '', createdAt: a.createdAt
+					}));
 
 					loading = false;
 				});
@@ -321,8 +385,8 @@
 					description={u.role === 'admin' ? 'Yönetici' : u.role === 'viewer' ? 'İzleyici' : 'Üye'}
 					avatarText={initials(u.profile?.fullName ?? '?')}
 					variant="avatar"
-					active={selectedUserId === u.profile.id}
-					onclick={() => (selectedUserId = u.profile.id)}
+					active={selectedUserId === u.userId}
+					onclick={() => (selectedUserId = u.userId)}
 				/>
 			{/each}
 		</div>
@@ -370,6 +434,39 @@
 				<div class="empty-state">Bu tarihte kayıt yok</div>
 			{:else}
 				{#each pagedFeedItems as item (item._kind + '-' + item.id)}
+					{#if item._kind === 'overdue'}
+						{@const oname = profileByUserId[item.assignedTo]?.fullName ?? 'Personel'}
+						<div class="news-card overdue">
+							<div class="card-main">
+								<span class="avatar overdue-avatar">{initials(oname)}</span>
+								<span class="card-body">
+									<span class="card-row">
+										<span class="card-name">{oname}</span>
+										<span class="card-meta">{fmtStamp(item.createdAt)}</span>
+									</span>
+									<span class="card-sub overdue-text">
+										<strong>{oname}</strong>, {item.title} görevini yapmadı
+									</span>
+								</span>
+							</div>
+						</div>
+					{:else if item._kind === 'completed'}
+						{@const cname = item.actorName || 'Personel'}
+						<div class="news-card completed">
+							<div class="card-main">
+								<span class="avatar completed-avatar">{initials(cname)}</span>
+								<span class="card-body">
+									<span class="card-row">
+										<span class="card-name">{cname}</span>
+										<span class="card-meta">{fmtStamp(item.createdAt)}</span>
+									</span>
+									<span class="card-sub completed-text">
+										<strong>{cname}</strong> {item.description}
+									</span>
+								</span>
+							</div>
+						</div>
+					{:else}
 					{@const profile  = profileByUserId[item.createdBy]}
 					{@const name     = profile?.fullName ?? 'Personel'}
 
@@ -413,6 +510,7 @@
 						</div>
 
 					</div>
+					{/if}
 				{/each}
 				{#if totalPages > 1}
 					<div class="pagination">
@@ -804,6 +902,36 @@
 	white-space: nowrap;
 	overflow: hidden;
 	text-overflow: ellipsis;
+}
+
+/* ── Gecikme (overdue) satırı ───────────────────────────────────── */
+.news-card.overdue {
+	background: color-mix(in srgb, #ef4444 8%, var(--list-item));
+}
+.news-card.overdue:hover {
+	background: color-mix(in srgb, #ef4444 14%, var(--list-item));
+}
+.overdue-avatar {
+	background: color-mix(in srgb, #ef4444 20%, var(--surface-muted));
+	color: #fecaca;
+}
+.overdue-text {
+	color: #f87171;
+}
+
+/* ── Tamamlandı (completed) satırı — overdue'nun pozitif kardeşi ─── */
+.news-card.completed {
+	background: color-mix(in srgb, var(--success) 8%, var(--list-item));
+}
+.news-card.completed:hover {
+	background: color-mix(in srgb, var(--success) 14%, var(--list-item));
+}
+.completed-avatar {
+	background: color-mix(in srgb, var(--success) 20%, var(--surface-muted));
+	color: #bbf7d0;
+}
+.completed-text {
+	color: var(--success);
 }
 
 /* ── Card actions ───────────────────────────────────────────────── */
