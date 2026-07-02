@@ -8,7 +8,7 @@
 	} = $props();
 
 	const variantClass: Record<string, string> = {
-		default: 'bg-[#222] text-[#888]',
+		default: 'bg-[var(--hb-tag)] text-[var(--hb-title)]',
 		success: 'bg-[#1a2a1a] text-green-400',
 		warning: 'bg-[#2a1e0a] text-amber-400',
 		danger:  'bg-[#2a1a1a] text-[#ff4444]',

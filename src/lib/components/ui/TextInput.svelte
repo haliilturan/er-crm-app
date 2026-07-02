@@ -32,8 +32,8 @@
 
 <div class="flex flex-col gap-1.5 w-full">
 	{#if label}
-		<label for={id} class="text-xs text-[#888]">
-			{label}{#if required}<span class="text-[#ff4444] ml-0.5">*</span>{/if}
+		<label for={id} class="text-xs text-[var(--hb-body)]">
+			{label}{#if required}<span class="text-[var(--hb-accent)] ml-0.5">*</span>{/if}
 		</label>
 	{/if}
 	<input
@@ -48,13 +48,13 @@
 		{onfocus}
 		{onblur}
 		bind:value
-		class="w-full bg-[#1a1a1a] border rounded-xl px-3 py-2 text-white text-sm
-			placeholder-[#555] outline-none transition-colors
-			focus:border-[#444]
+		class="w-full bg-[var(--hb-field)] border rounded-lg px-3 py-2 text-white text-sm
+			placeholder-[var(--hb-faint)] outline-none transition-colors
+			focus:border-[var(--hb-highlight)]
 			disabled:opacity-50 disabled:cursor-not-allowed
-			{error ? 'border-[#ff4444]' : 'border-[#2a2a2a]'}"
+			{error ? 'border-[var(--hb-accent)]' : 'border-[var(--hb-border)]'}"
 	/>
 	{#if error}
-		<p class="text-xs text-[#ff4444]">{error}</p>
+		<p class="text-xs text-[var(--hb-accent)]">{error}</p>
 	{/if}
 </div>

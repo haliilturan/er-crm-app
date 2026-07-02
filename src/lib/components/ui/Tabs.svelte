@@ -29,7 +29,7 @@
 	}
 </script>
 
-<div class="inline-flex gap-1">
+<div class="inline-flex items-center gap-1 p-1 rounded-full bg-[var(--hb-track)]">
 	{#each tabs as tab (tab.value)}
 		<button
 			type="button"
@@ -40,8 +40,8 @@
 				disabled:opacity-50 disabled:cursor-not-allowed
 				{variant === 'icon' ? 'w-9 h-9' : 'px-4 py-1'}
 				{value === tab.value
-					? 'bg-white text-black font-medium'
-					: 'text-[#888] hover:text-white'}"
+					? 'bg-[var(--hb-active)] text-white font-medium'
+					: 'text-[var(--hb-body)] hover:text-white'}"
 		>
 			{#if variant === 'icon' && tab.icon}
 				{@const TabIcon = tab.icon}

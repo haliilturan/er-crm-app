@@ -18,7 +18,7 @@
 
 <div class="flex h-full overflow-hidden">
 	<!-- ═══ Client list panel ═══════════════════════════════════════════════════ -->
-	<div class="w-80 shrink-0 border-r border-[#2a2a2a] overflow-hidden flex flex-col">
+	<div class="w-80 shrink-0 border-r border-[var(--hb-border)] overflow-hidden flex flex-col">
 		<ClientList
 			selectedId={selectedClientId}
 			onSelect={handleSelect}
@@ -35,7 +35,7 @@
 	{#if salesStore.modalOpen}
 		<aside
 			transition:fly={{ x: 384, duration: 280 }}
-			class="w-110 shrink-0 border-l border-[#2a2a2a] overflow-hidden flex flex-col bg-[#111111]"
+			class="w-110 shrink-0 border-l border-[var(--hb-border)] overflow-hidden flex flex-col bg-[var(--hb-panel)]"
 		>
 			<CustomerModal
 				customerId={salesStore.modalEntityId}

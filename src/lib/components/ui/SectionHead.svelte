@@ -27,18 +27,18 @@
 	>
 		<h2 class="text-2xl font-bold text-white leading-none">{title}</h2>
 		{#if children}
-			<p class="text-sm text-[#888] leading-none">{@render children()}</p>
+			<p class="text-sm text-[var(--hb-body)] leading-none">{@render children()}</p>
 		{:else if description}
-			<p class="text-sm text-[#888] leading-none">{description}</p>
+			<p class="text-sm text-[var(--hb-body)] leading-none">{description}</p>
 		{/if}
 	</button>
 {:else}
 	<div class="flex flex-col gap-1">
 		<h2 class="text-2xl font-bold text-white leading-none">{title}</h2>
 		{#if children}
-			<p class="text-sm text-[#888] leading-none">{@render children()}</p>
+			<p class="text-sm text-[var(--hb-body)] leading-none">{@render children()}</p>
 		{:else if description}
-			<p class="text-sm text-[#888] leading-none">{description}</p>
+			<p class="text-sm text-[var(--hb-body)] leading-none">{description}</p>
 		{/if}
 	</div>
 {/if}

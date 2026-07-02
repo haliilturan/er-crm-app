@@ -1484,7 +1484,7 @@
 	<div class="flex h-full flex-col overflow-hidden">
 
 		<!-- ── Header ─────────────────────────────────────────────────────────── -->
-		<div class="shrink-0 border-b border-[#2a2a2a] bg-[#111111] px-6 py-5">
+		<div class="shrink-0 border-b border-[var(--hb-border)] bg-[var(--hb-panel)] px-6 py-5">
 			<div class="flex items-start justify-between gap-4">
 				<div class="flex items-center gap-4 min-w-0">
 					<Avatar fallbackText={initials(customer.name)} size="lg" />
@@ -1496,10 +1496,10 @@
 								<Badge variant={sc.variant} label={sc.label} />
 							{/if}
 							{#if customer.city}
-								<span class="text-sm text-[#888]">{customer.city}</span>
+								<span class="text-sm text-[var(--hb-body)]">{customer.city}</span>
 							{/if}
 							{#if customer.contactName}
-								<span class="text-sm text-[#888]">· {customer.contactName}</span>
+								<span class="text-sm text-[var(--hb-body)]">· {customer.contactName}</span>
 							{/if}
 						</div>
 					</div>
@@ -1530,21 +1530,21 @@
 					{#snippet inforow(label: string, value: string | undefined)}
 						{#if value}
 							<div class="flex items-start justify-between gap-4 py-2.5">
-								<dt class="text-sm text-[#888] shrink-0">{label}</dt>
+								<dt class="text-sm text-[var(--hb-body)] shrink-0">{label}</dt>
 								<dd class="text-sm font-medium text-white text-right">{value}</dd>
 							</div>
 						{/if}
 					{/snippet}
 
 					<!-- Genel -->
-					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
-						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Genel</p>
-						<dl class="divide-y divide-[#2a2a2a]">
+					<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-5">
+						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--hb-faint)]">Genel</p>
+						<dl class="divide-y divide-[var(--hb-border)]">
 							{@render inforow('Müşteri Tip', typeLabels[customer.companyType] ?? customer.companyType)}
 							{@render inforow('Müşteri Sektör', customer.source)}
 							<!-- Durum — inline editable -->
 							<div class="flex items-center justify-between gap-4 py-2.5">
-								<dt class="text-sm text-[#888] shrink-0">Durum</dt>
+								<dt class="text-sm text-[var(--hb-body)] shrink-0">Durum</dt>
 								<dd class="flex items-center gap-2">
 									{#if editingStatus}
 										<select
@@ -1552,7 +1552,7 @@
 											disabled={statusSaving}
 											onchange={(e) => updateStatus((e.target as HTMLSelectElement).value)}
 											class="rounded-lg border border-[#444] bg-[#111] px-2 py-1 text-sm text-white
-												[&>option]:bg-[#1a1a1a] focus:outline-none disabled:opacity-50"
+												[&>option]:bg-[var(--hb-list)] focus:outline-none disabled:opacity-50"
 										>
 											{#each STATUS_OPTIONS as opt (opt.value)}
 												<option value={opt.value}>{opt.label}</option>
@@ -1560,7 +1560,7 @@
 										</select>
 										{#if !statusSaving}
 											<button type="button" onclick={() => (editingStatus = false)}
-												class="text-xs text-[#555] hover:text-[#888] transition-colors">İptal</button>
+												class="text-xs text-[var(--hb-faint)] hover:text-[var(--hb-body)] transition-colors">İptal</button>
 										{/if}
 									{:else}
 										{#if statusConfig[customer.status]}
@@ -1571,7 +1571,7 @@
 										{/if}
 										<button type="button" title="Durumu değiştir"
 											onclick={() => (editingStatus = true)}
-											class="p-1 rounded hover:bg-[#2a2a2a] text-[#555] hover:text-[#888] transition-colors">
+											class="p-1 rounded hover:bg-[var(--hb-hover)] text-[var(--hb-faint)] hover:text-[var(--hb-body)] transition-colors">
 											<svg class="w-3 h-3" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 												<path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/>
 												<path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/>
@@ -1584,18 +1584,18 @@
 					</div>
 
 					<!-- Temel Bilgiler -->
-					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
-						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Temel Bilgiler</p>
-						<dl class="divide-y divide-[#2a2a2a]">
+					<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-5">
+						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--hb-faint)]">Temel Bilgiler</p>
+						<dl class="divide-y divide-[var(--hb-border)]">
 							{@render inforow('Müşteri Adı', customer.name)}
 							{@render inforow('Firma Yetkili', customer.contactName)}
 						</dl>
 					</div>
 
 					<!-- İletişim -->
-					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
-						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">İletişim</p>
-						<dl class="divide-y divide-[#2a2a2a]">
+					<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-5">
+						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--hb-faint)]">İletişim</p>
+						<dl class="divide-y divide-[var(--hb-border)]">
 							{@render inforow('Telefon (Mobil)', customer.phone)}
 							{@render inforow('Telefon (Sabit)', customer.phoneLandline)}
 							{@render inforow('E-Posta', customer.email)}
@@ -1604,9 +1604,9 @@
 					</div>
 
 					<!-- Adres -->
-					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
-						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Adres</p>
-						<dl class="divide-y divide-[#2a2a2a]">
+					<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-5">
+						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--hb-faint)]">Adres</p>
+						<dl class="divide-y divide-[var(--hb-border)]">
 							{@render inforow('Ülke', customer.country)}
 							{@render inforow('İl', customer.state)}
 							{@render inforow('Şehir / İlçe', customer.city)}
@@ -1616,9 +1616,9 @@
 					</div>
 
 					<!-- Sistem -->
-					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
-						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Sistem</p>
-						<dl class="divide-y divide-[#2a2a2a]">
+					<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-5">
+						<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--hb-faint)]">Sistem</p>
+						<dl class="divide-y divide-[var(--hb-border)]">
 							{@render inforow('Vergi No', customer.taxNumber)}
 							{@render inforow('Vergi Dairesi', customer.contactTitle)}
 							{@render inforow('Oluşturulma', formatDate(customer.createdAt))}
@@ -1630,41 +1630,41 @@
 				<div class="flex flex-col gap-4 max-w-2xl">
 
 					<!-- Yeni not formu -->
-					<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
+					<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-5">
 						<p class="mb-3 text-sm font-semibold text-white">Yeni Not</p>
 						<div class="space-y-3">
 							<input
 								type="text"
 								bind:value={noteForm.title}
 								placeholder="Başlık (opsiyonel)"
-								class="block w-full rounded-xl border border-[#2a2a2a] bg-[#111111] px-3 py-2 text-sm text-white placeholder-[#555] focus:border-[#555] focus:outline-none"
+								class="block w-full rounded-lg border border-[var(--hb-border)] bg-[var(--hb-panel)] px-3 py-2 text-sm text-white placeholder-[var(--hb-faint)] focus:border-[var(--hb-highlight)] focus:outline-none"
 							/>
 							<textarea
 								bind:value={noteForm.content}
 								rows="3"
 								maxlength={500}
 								placeholder="Not içeriği..."
-								class="block w-full resize-none rounded-xl border px-3 py-2 text-sm text-white placeholder-[#555] focus:outline-none bg-[#111111] {noteAttempted && !noteForm.content.trim()
+								class="block w-full resize-none rounded-lg border px-3 py-2 text-sm text-white placeholder-[var(--hb-faint)] focus:outline-none bg-[var(--hb-panel)] {noteAttempted && !noteForm.content.trim()
 									? 'border-[#ff4444]'
-									: 'border-[#2a2a2a] focus:border-[#555]'}"
+									: 'border-[var(--hb-border)] focus:border-[var(--hb-highlight)]'}"
 							></textarea>
 							<div class="flex items-center justify-between">
 								{#if noteAttempted && !noteForm.content.trim()}
-									<p class="text-xs text-[#ff4444]">İçerik alanı zorunludur.</p>
+									<p class="text-xs text-[var(--hb-accent)]">İçerik alanı zorunludur.</p>
 								{:else}
 									<span></span>
 								{/if}
-								<span class="text-xs {noteForm.content.length >= 450 ? 'text-amber-500' : 'text-[#555]'}">{noteForm.content.length}/500</span>
+								<span class="text-xs {noteForm.content.length >= 450 ? 'text-amber-500' : 'text-[var(--hb-faint)]'}">{noteForm.content.length}/500</span>
 							</div>
 							{#if noteError}
-								<p class="text-xs text-[#ff4444]">{noteError}</p>
+								<p class="text-xs text-[var(--hb-accent)]">{noteError}</p>
 							{/if}
 							<div class="flex justify-end">
 								<button
 									onclick={addNote}
 									disabled={noteSaving}
 									style={noteSaving ? 'pointer-events: none' : ''}
-									class="flex items-center gap-2 rounded-full bg-white px-5 py-2 text-sm font-bold text-black transition hover:bg-[#e0e0e0] disabled:opacity-50"
+									class="flex items-center gap-2 rounded-full bg-[var(--hb-active)] px-5 py-2 text-sm font-bold text-white transition hover:bg-[var(--hb-hover)] disabled:opacity-50"
 								>
 									{#if noteSaving}
 										<span class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-black border-t-transparent"></span>
@@ -1679,23 +1679,23 @@
 
 					<!-- Not listesi -->
 					{#if notes.length === 0}
-						<div class="rounded-xl border border-dashed border-[#2a2a2a] py-10 text-center">
-							<p class="text-sm text-[#888]">Henüz not eklenmemiş.</p>
+						<div class="rounded-lg border border-dashed border-[var(--hb-border)] py-10 text-center">
+							<p class="text-sm text-[var(--hb-body)]">Henüz not eklenmemiş.</p>
 						</div>
 					{:else}
 						<div class="flex flex-col gap-3">
 							{#each notes as note (note.id)}
 								{@const authorName = note.author?.fullName ?? userProfileMap[note.createdBy]?.name ?? 'Kullanıcı'}
-								<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-5">
+								<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-5">
 									{#if note.title}
 										<p class="mb-1.5 text-sm font-semibold text-white">{note.title}</p>
 									{/if}
-									<p class="wrap-break-word whitespace-pre-wrap overflow-hidden text-sm leading-relaxed text-[#888]">{note.content}</p>
+									<p class="wrap-break-word whitespace-pre-wrap overflow-hidden text-sm leading-relaxed text-[var(--hb-body)]">{note.content}</p>
 									<div class="mt-3 flex items-center gap-2">
-										<div class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#333] text-[10px] font-bold text-[#888]">
+										<div class="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[var(--hb-muted)] text-[10px] font-bold text-[var(--hb-body)]">
 											{initials(authorName)}
 										</div>
-										<span class="text-xs text-[#555]">
+										<span class="text-xs text-[var(--hb-faint)]">
 											{authorName} · {formatTs(note.createdAt)}
 										</span>
 									</div>
@@ -1717,20 +1717,20 @@
 					<div class="max-w-2xl">
 						<div class="mb-3 flex items-center justify-between gap-3">
 							<div class="relative flex-1">
-								<svg class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#555]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<svg class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--hb-faint)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 									<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
 								</svg>
 								<input
 									type="text"
 									placeholder="Teklif ara…"
 									bind:value={teklifArama}
-									class="w-full rounded-lg border border-[#2a2a2a] bg-[#141414] py-1.5 pl-8 pr-3 text-sm text-white placeholder-[#555] outline-none focus:border-[#444]"
+									class="w-full rounded-lg border border-[var(--hb-border)] bg-[var(--hb-field)] py-1.5 pl-8 pr-3 text-sm text-white placeholder-[var(--hb-faint)] outline-none focus:border-[var(--hb-highlight)]"
 								/>
 							</div>
 							<button
 								type="button"
 								onclick={() => { editingQuote = null; showQuoteForm = true; }}
-								class="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-4 py-1.5 text-sm font-bold text-black transition hover:bg-[#e0e0e0]"
+								class="flex shrink-0 items-center gap-1.5 rounded-full bg-[var(--hb-active)] px-4 py-1.5 text-sm font-bold text-white transition hover:bg-[var(--hb-hover)]"
 							>
 								<svg class="h-3.5 w-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
 									<path d="M12 4.5v15m7.5-7.5h-15" />
@@ -1739,8 +1739,8 @@
 							</button>
 						</div>
 						{#if quotes.length === 0}
-							<div class="rounded-xl border border-dashed border-[#2a2a2a] py-10 text-center">
-								<p class="text-sm text-[#888]">Henüz teklif oluşturulmamış.</p>
+							<div class="rounded-lg border border-dashed border-[var(--hb-border)] py-10 text-center">
+								<p class="text-sm text-[var(--hb-body)]">Henüz teklif oluşturulmamış.</p>
 								<button
 									type="button"
 									onclick={() => { editingQuote = null; showQuoteForm = true; }}
@@ -1754,13 +1754,13 @@
 							<div class="flex flex-col gap-2">
 								{#each filteredQuotes as quote (quote.id)}
 									{@const qsc = statusConfig[quote.status]}
-									<div class="flex items-center justify-between rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-5 py-4">
+									<div class="flex items-center justify-between rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] px-5 py-4">
 										<div>
 											<p class="text-sm font-bold text-white">{quote.orderNumber}</p>
-											<p class="text-xs text-[#888] mt-0.5">{formatDate(quote.createdAt)}</p>
+											<p class="text-xs text-[var(--hb-body)] mt-0.5">{formatDate(quote.createdAt)}</p>
 										</div>
 										<div class="flex items-center gap-3">
-											<span class="text-sm font-semibold text-[#888]">{formatMoney(quote.totalWithVat, quote.currency)}</span>
+											<span class="text-sm font-semibold text-[var(--hb-body)]">{formatMoney(quote.totalWithVat, quote.currency)}</span>
 											{#if qsc}
 												<Badge variant={qsc.variant} label={qsc.label} />
 											{/if}
@@ -1782,18 +1782,18 @@
 												type="button"
 												onclick={() => { editingQuote = quote; showQuoteForm = true; }}
 												title="Düzenle"
-												class="flex h-7 items-center rounded-lg border border-[#2a2a2a] px-2 text-xs text-[#666] transition hover:border-[#444] hover:text-white"
+												class="flex h-7 items-center rounded-lg border border-[var(--hb-border)] px-2 text-xs text-[var(--hb-body)] transition hover:border-[var(--hb-highlight)] hover:text-white"
 											>Düzenle</button>
 											<button
 												type="button"
 												onclick={() => openDetailModal('quote', quote)}
-												class="flex h-7 items-center rounded-lg border border-[#2a2a2a] px-2 text-xs text-[#666] transition hover:border-[#444] hover:text-white"
+												class="flex h-7 items-center rounded-lg border border-[var(--hb-border)] px-2 text-xs text-[var(--hb-body)] transition hover:border-[var(--hb-highlight)] hover:text-white"
 												title="Detay"
 											>Detay</button>
 											<button
 												type="button"
 												onclick={() => openLangModal('quote', quote)}
-												class="flex h-7 w-7 items-center justify-center rounded-lg border border-[#2a2a2a] text-[#666] transition hover:border-[#444] hover:text-white"
+												class="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--hb-border)] text-[var(--hb-body)] transition hover:border-[var(--hb-highlight)] hover:text-white"
 												aria-label="PDF İndir"
 												title="PDF İndir"
 											>
@@ -1804,7 +1804,7 @@
 											<button
 												type="button"
 												onclick={() => openProformaModal(quote)}
-												class="flex h-7 items-center rounded-lg border border-[#2a2a2a] px-2 text-xs text-[#666] transition hover:border-[#444] hover:text-white"
+												class="flex h-7 items-center rounded-lg border border-[var(--hb-border)] px-2 text-xs text-[var(--hb-body)] transition hover:border-[var(--hb-highlight)] hover:text-white"
 												title="Proforma PDF"
 											>Proforma</button>
 										</div>
@@ -1829,24 +1829,24 @@
 						: orders.slice(0, 5)}
 					<div class="max-w-2xl">
 						<div class="mb-3 flex items-center justify-between gap-3">
-							<span class="shrink-0 text-xs text-[#555]">
+							<span class="shrink-0 text-xs text-[var(--hb-faint)]">
 								{siparisArama.length >= 3 ? 'Arama sonuçları' : 'Son 5 sipariş'}
 							</span>
 							<div class="relative flex-1 max-w-xs">
-								<svg class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[#555]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+								<svg class="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--hb-faint)]" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 									<circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
 								</svg>
 								<input
 									type="text"
 									placeholder="Sipariş ara… (min. 3 karakter)"
 									bind:value={siparisArama}
-									class="w-full rounded-lg border border-[#2a2a2a] bg-[#141414] py-1.5 pl-8 pr-3 text-sm text-white placeholder-[#555] outline-none focus:border-[#444]"
+									class="w-full rounded-lg border border-[var(--hb-border)] bg-[var(--hb-field)] py-1.5 pl-8 pr-3 text-sm text-white placeholder-[var(--hb-faint)] outline-none focus:border-[var(--hb-highlight)]"
 								/>
 							</div>
 						</div>
 						{#if filtrelenmisOrders.length === 0}
-							<div class="rounded-xl border border-dashed border-[#2a2a2a] py-10 text-center">
-								<p class="text-sm text-[#888]">
+							<div class="rounded-lg border border-dashed border-[var(--hb-border)] py-10 text-center">
+								<p class="text-sm text-[var(--hb-body)]">
 									{siparisArama.length >= 3 ? 'Sipariş bulunamadı.' : 'Henüz sipariş oluşturulmamış.'}
 								</p>
 							</div>
@@ -1854,13 +1854,13 @@
 							<div class="flex flex-col gap-2">
 								{#each filtrelenmisOrders as order (order.id)}
 									{@const osc = statusConfig[order.status]}
-									<div class="flex items-center justify-between rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] px-5 py-4">
+									<div class="flex items-center justify-between rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] px-5 py-4">
 										<div>
 											<p class="text-sm font-bold text-white">{order.orderNumber}</p>
-											<p class="text-xs text-[#888] mt-0.5">{formatDate(order.createdAt)}</p>
+											<p class="text-xs text-[var(--hb-body)] mt-0.5">{formatDate(order.createdAt)}</p>
 										</div>
 										<div class="flex items-center gap-3">
-											<span class="text-sm font-semibold text-[#888]">{formatMoney(order.totalWithVat, order.currency)}</span>
+											<span class="text-sm font-semibold text-[var(--hb-body)]">{formatMoney(order.totalWithVat, order.currency)}</span>
 											{#if osc}
 												<Badge variant={osc.variant} label={osc.label} />
 											{/if}
@@ -1877,19 +1877,19 @@
 													type="button"
 													onclick={() => { editingOrder = order; showOrderForm = true; }}
 													title="Düzenle"
-													class="flex h-7 items-center rounded-lg border border-[#2a2a2a] px-2 text-xs text-[#666] transition hover:border-[#444] hover:text-white"
+													class="flex h-7 items-center rounded-lg border border-[var(--hb-border)] px-2 text-xs text-[var(--hb-body)] transition hover:border-[var(--hb-highlight)] hover:text-white"
 												>Düzenle</button>
 											{/if}
 											<button
 												type="button"
 												onclick={() => openDetailModal('order', order)}
-												class="flex h-7 items-center rounded-lg border border-[#2a2a2a] px-2 text-xs text-[#666] transition hover:border-[#444] hover:text-white"
+												class="flex h-7 items-center rounded-lg border border-[var(--hb-border)] px-2 text-xs text-[var(--hb-body)] transition hover:border-[var(--hb-highlight)] hover:text-white"
 												title="Detay"
 											>Detay</button>
 											<button
 												type="button"
 												onclick={() => openLangModal('order', order)}
-												class="flex h-7 w-7 items-center justify-center rounded-lg border border-[#2a2a2a] text-[#666] transition hover:border-[#444] hover:text-white"
+												class="flex h-7 w-7 items-center justify-center rounded-lg border border-[var(--hb-border)] text-[var(--hb-body)] transition hover:border-[var(--hb-highlight)] hover:text-white"
 												aria-label="PDF İndir"
 												title="PDF İndir"
 											>
@@ -1908,8 +1908,8 @@
 			{:else if tabValue === 'payments'}
 				<div class="flex flex-col gap-6 max-w-2xl">
 					{#if orders.length === 0}
-						<div class="rounded-xl border border-dashed border-[#2a2a2a] py-10 text-center">
-							<p class="text-sm text-[#888]">Henüz sipariş bulunmuyor</p>
+						<div class="rounded-lg border border-dashed border-[var(--hb-border)] py-10 text-center">
+							<p class="text-sm text-[var(--hb-body)]">Henüz sipariş bulunmuyor</p>
 						</div>
 					{:else}
 						<!-- 1. Özet kartları para birimi bazında -->
@@ -1917,61 +1917,61 @@
 							{@const remaining = totals.totalDebt - totals.totalPaid}
 							{@const remainingUSD = totals.totalDebtUSD - totals.totalPaidUSD}
 							<div>
-								<p class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[#555]">{currency}</p>
+								<p class="mb-2 text-[11px] font-semibold uppercase tracking-wider text-[var(--hb-faint)]">{currency}</p>
 								<div class="grid grid-cols-4 gap-3">
-									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
-										<p class="text-xs text-[#555]">Toplam Borç</p>
+									<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-4">
+										<p class="text-xs text-[var(--hb-faint)]">Toplam Borç</p>
 										<p class="mt-1 text-sm font-bold text-white">{formatMoney(totals.totalDebt, currency)}</p>
-										<p class="mt-1 text-[11px] text-[#555]">Toplam sipariş tutarı</p>
+										<p class="mt-1 text-[11px] text-[var(--hb-faint)]">Toplam sipariş tutarı</p>
 										{#if canConvertToUSD(currency) && totals.totalDebtUSD > 0}
 											<p class="mt-0.5 text-[10px] text-[#444]">{fmtUSD(totals.totalDebtUSD)}</p>
 										{/if}
 									</div>
-									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
-										<p class="text-xs text-[#555]">Toplam Ödenen</p>
+									<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-4">
+										<p class="text-xs text-[var(--hb-faint)]">Toplam Ödenen</p>
 										<p class="mt-1 text-sm font-bold text-emerald-400">{formatMoney(totals.totalPaid, currency)}</p>
-										<p class="mt-1 text-[11px] text-[#555]">Yapılan ödemeler</p>
+										<p class="mt-1 text-[11px] text-[var(--hb-faint)]">Yapılan ödemeler</p>
 										{#if currency !== 'USD'}
 											<p class="mt-0.5 text-[10px] text-[#444]">{displayUSD(totals.totalPaid, currency)}</p>
 										{/if}
 									</div>
-									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
-										<p class="text-xs text-[#555]">Kalan Bakiye</p>
-										<p class="mt-1 text-sm font-bold {remaining > 0 ? 'text-red-400' : remaining < 0 ? 'text-emerald-400' : 'text-[#888]'}">{formatMoney(Math.abs(remaining), currency)}</p>
-										<p class="mt-1 text-[11px] text-[#555]">{remaining > 0 ? 'Ödenmemiş bakiye' : remaining < 0 ? 'Fazla ödeme' : 'Ödemeler tamamlandı'}</p>
+									<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-4">
+										<p class="text-xs text-[var(--hb-faint)]">Kalan Bakiye</p>
+										<p class="mt-1 text-sm font-bold {remaining > 0 ? 'text-red-400' : remaining < 0 ? 'text-emerald-400' : 'text-[var(--hb-body)]'}">{formatMoney(Math.abs(remaining), currency)}</p>
+										<p class="mt-1 text-[11px] text-[var(--hb-faint)]">{remaining > 0 ? 'Ödenmemiş bakiye' : remaining < 0 ? 'Fazla ödeme' : 'Ödemeler tamamlandı'}</p>
 										{#if canConvertToUSD(currency) && Math.abs(remaining) > 0}
 											<p class="mt-0.5 text-[10px] text-[#444]">{fmtUSD(toUSD(Math.abs(remaining), currency))}</p>
 										{/if}
 									</div>
-									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
-										<p class="text-xs text-[#555]">USD Karşılığı</p>
+									<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-4">
+										<p class="text-xs text-[var(--hb-faint)]">USD Karşılığı</p>
 										<div class="mt-2 flex flex-col gap-1.5">
 											<div class="flex items-center justify-between">
-												<span class="text-[10px] text-[#555]">Borç</span>
+												<span class="text-[10px] text-[var(--hb-faint)]">Borç</span>
 												<span class="text-xs font-medium text-white">{fmtDollar(totals.totalDebtUSD)}</span>
 											</div>
 											<div class="flex items-center justify-between">
-												<span class="text-[10px] text-[#555]">Ödenen</span>
+												<span class="text-[10px] text-[var(--hb-faint)]">Ödenen</span>
 												<span class="text-xs font-medium text-emerald-400">{fmtDollar(totals.totalPaidUSD)}</span>
 											</div>
 											<div class="mt-0.5 flex items-center justify-between border-t border-[#222] pt-1.5">
-												<span class="text-[10px] text-[#555]">Kalan</span>
+												<span class="text-[10px] text-[var(--hb-faint)]">Kalan</span>
 												<span class="text-xs font-semibold {remainingUSD > 0 ? 'text-red-400' : 'text-emerald-400'}">{fmtDollar(Math.abs(remainingUSD))}</span>
 											</div>
 										{#if totals.hasForex}
 											{@const netEffect = totals.forexToday - totals.forexFixed}
 											<div class="mt-2 border-t border-[#222] pt-2">
-												<p class="mb-1.5 text-[10px] font-semibold text-[#555]">Döviz Etkisi</p>
+												<p class="mb-1.5 text-[10px] font-semibold text-[var(--hb-faint)]">Döviz Etkisi</p>
 												<div class="flex items-center justify-between">
-													<span class="text-[10px] text-[#555]">Sabit (ödeme anı)</span>
-													<span class="text-[10px] text-[#888]">{fmtDollar(totals.forexFixed)}</span>
+													<span class="text-[10px] text-[var(--hb-faint)]">Sabit (ödeme anı)</span>
+													<span class="text-[10px] text-[var(--hb-body)]">{fmtDollar(totals.forexFixed)}</span>
 												</div>
 												<div class="flex items-center justify-between">
-													<span class="text-[10px] text-[#555]">Bugünkü değer</span>
-													<span class="text-[10px] text-[#888]">{fmtDollar(totals.forexToday)}</span>
+													<span class="text-[10px] text-[var(--hb-faint)]">Bugünkü değer</span>
+													<span class="text-[10px] text-[var(--hb-body)]">{fmtDollar(totals.forexToday)}</span>
 												</div>
 												<div class="mt-0.5 flex items-center justify-between border-t border-[#1a1a1a] pt-1">
-													<span class="text-[10px] text-[#555]">Net etki</span>
+													<span class="text-[10px] text-[var(--hb-faint)]">Net etki</span>
 													<span class="text-[10px] font-semibold {netEffect >= 0 ? 'text-emerald-400' : 'text-red-400'}">{netEffect >= 0 ? '+' : '-'}{fmtDollar(Math.abs(netEffect))} {netEffect >= 0 ? '▲' : '▼'}</span>
 												</div>
 											</div>
@@ -1984,36 +1984,36 @@
 
 						<!-- 2. Sipariş bazlı liste -->
 						<div>
-							<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Sipariş Bazlı</p>
+							<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--hb-faint)]">Sipariş Bazlı</p>
 							<div class="flex flex-col gap-3">
 								{#each orders as order (order.id)}
 									{@const paid = calcOrderPaid(order)}
 									{@const remaining = calcOrderRemaining(order)}
 									{@const sortedPayments = [...(order.payments ?? [])].sort((a, b) => b.paidAt - a.paidAt)}
-									<div class="rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+									<div class="rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-4">
 										<div class="mb-3 flex items-center justify-between">
 											<div class="flex items-center gap-2">
 												<span class="text-sm font-bold text-white">{order.orderNumber}</span>
-												<span class="text-xs text-[#555]">·</span>
-												<span class="text-xs text-[#555]">{formatDate(order.createdAt)}</span>
+												<span class="text-xs text-[var(--hb-faint)]">·</span>
+												<span class="text-xs text-[var(--hb-faint)]">{formatDate(order.createdAt)}</span>
 											</div>
 											{#if remaining === 0 && paid > 0}
 												<span class="rounded-full bg-emerald-400/10 px-2 py-0.5 text-xs font-medium text-emerald-400">Ödendi</span>
 											{:else if paid > 0}
 												<span class="rounded-full bg-amber-400/10 px-2 py-0.5 text-xs font-medium text-amber-400">Kısmen</span>
 											{:else}
-												<span class="rounded-full bg-[#222] px-2 py-0.5 text-xs font-medium text-[#555]">Ödenmedi</span>
+												<span class="rounded-full bg-[#222] px-2 py-0.5 text-xs font-medium text-[var(--hb-faint)]">Ödenmedi</span>
 											{/if}
 										</div>
-										<div class="mb-3 border-b border-[#2a2a2a] pb-3">
-											<span class="text-sm text-[#888]">Toplam: </span>
+										<div class="mb-3 border-b border-[var(--hb-border)] pb-3">
+											<span class="text-sm text-[var(--hb-body)]">Toplam: </span>
 											<span class="text-sm font-semibold text-white">{formatMoney(order.totalWithVat, order.currency)}</span>
 											{#if canConvertToUSD(order.currency)}
 												<span class="ml-1 text-xs text-[#444]">({fmtUSD(toUSD(order.totalWithVat, order.currency))})</span>
 											{/if}
 										</div>
 										{#if sortedPayments.length === 0}
-											<p class="py-1 text-xs text-[#555]">Henüz ödeme yapılmamış</p>
+											<p class="py-1 text-xs text-[var(--hb-faint)]">Henüz ödeme yapılmamış</p>
 										{:else}
 											<div class="mb-3 flex flex-col gap-1.5">
 												{#each sortedPayments as payment (payment.id)}
@@ -2025,16 +2025,16 @@
 															{#if payment.currency !== 'USD'}
 																<span class="text-[#444]">({displayUSD(payment.amount, payment.currency)})</span>
 															{/if}
-															<span class="text-[#555]">·</span>
-															<span class="text-[#555]">{formatDate(payment.paidAt)}</span>
+															<span class="text-[var(--hb-faint)]">·</span>
+															<span class="text-[var(--hb-faint)]">{formatDate(payment.paidAt)}</span>
 															{#if payment.note}
-																<span class="text-[#555]">·</span>
-																<span class="max-w-32 truncate text-[#555]">{payment.note}</span>
+																<span class="text-[var(--hb-faint)]">·</span>
+																<span class="max-w-32 truncate text-[var(--hb-faint)]">{payment.note}</span>
 															{/if}
 														</div>
 														{#if payment.amountUSD != null && pFark != null}
 															<div class="flex items-center gap-2 text-[10px]">
-																<span class="text-[#555]">Ödeme anı: {fmtDollar(payment.amountUSD)}</span>
+																<span class="text-[var(--hb-faint)]">Ödeme anı: {fmtDollar(payment.amountUSD)}</span>
 																<span class="text-[#444]">·</span>
 																<span class="font-medium {pFark >= 0 ? 'text-emerald-400' : 'text-red-400'}">{pFark >= 0 ? '+' : '-'}{fmtDollar(Math.abs(pFark))} {pFark >= 0 ? '▲' : '▼'}</span>
 															</div>
@@ -2055,7 +2055,7 @@
 													<span class="ml-1 text-[10px] text-[#444]">({fmtUSD(toUSD(remaining, order.currency))})</span>
 												{/if}
 											{:else}
-												<span class="text-xs text-[#555]">Kalan: {formatMoney(0, order.currency)}</span>
+												<span class="text-xs text-[var(--hb-faint)]">Kalan: {formatMoney(0, order.currency)}</span>
 											{/if}
 										</div>
 									</div>
@@ -2066,8 +2066,8 @@
 						<!-- 3. Genel ödeme timeline'ı -->
 						{#if allPaymentsTimeline.length > 0}
 							<div>
-								<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[#555]">Ödeme Geçmişi</p>
-								<div class="flex flex-col gap-2 rounded-xl border border-[#2a2a2a] bg-[#1a1a1a] p-4">
+								<p class="mb-3 text-[11px] font-semibold uppercase tracking-wider text-[var(--hb-faint)]">Ödeme Geçmişi</p>
+								<div class="flex flex-col gap-2 rounded-lg border border-[var(--hb-border)] bg-[var(--hb-list)] p-4">
 									{#each allPaymentsTimeline as payment (payment.id)}
 										{@const tlTodayUSD = toUSD(payment.amount, payment.currency)}
 										{@const tlFark = payment.amountUSD != null ? tlTodayUSD - payment.amountUSD : null}
@@ -2077,14 +2077,14 @@
 												{#if payment.currency !== 'USD'}
 													<span class="shrink-0 text-[#444]">({displayUSD(payment.amount, payment.currency)})</span>
 												{/if}
-												<span class="text-[#555]">→</span>
-												<span class="shrink-0 text-[#666]">{payment.orderNumber}</span>
-												<span class="text-[#555]">·</span>
-												<span class="text-[#555]">{formatDate(payment.paidAt)}</span>
+												<span class="text-[var(--hb-faint)]">→</span>
+												<span class="shrink-0 text-[var(--hb-body)]">{payment.orderNumber}</span>
+												<span class="text-[var(--hb-faint)]">·</span>
+												<span class="text-[var(--hb-faint)]">{formatDate(payment.paidAt)}</span>
 											</div>
 											{#if payment.amountUSD != null && tlFark != null}
 												<div class="flex items-center gap-2 text-[10px]">
-													<span class="text-[#555]">Ödeme anı: {fmtDollar(payment.amountUSD)}</span>
+													<span class="text-[var(--hb-faint)]">Ödeme anı: {fmtDollar(payment.amountUSD)}</span>
 													<span class="text-[#444]">·</span>
 													<span class="font-medium {tlFark >= 0 ? 'text-emerald-400' : 'text-red-400'}">{tlFark >= 0 ? '+' : '-'}{fmtDollar(Math.abs(tlFark))} {tlFark >= 0 ? '▲' : '▼'}</span>
 												</div>
@@ -2109,7 +2109,7 @@
 
 {:else}
 	<div class="flex h-full items-center justify-center">
-		<p class="text-sm text-[#888]">Müşteri bulunamadı.</p>
+		<p class="text-sm text-[var(--hb-body)]">Müşteri bulunamadı.</p>
 	</div>
 {/if}
 
@@ -2125,14 +2125,14 @@
 		onkeydown={(e) => e.key === 'Escape' && (langModalOpen = false)}
 	>
 		<div
-			class="relative w-75 rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a] p-6 shadow-2xl"
+			class="relative w-75 rounded-2xl border border-[var(--hb-border)] bg-[var(--hb-list)] p-6 shadow-2xl"
 			role="presentation"
 			onclick={(e) => e.stopPropagation()}
 		>
 			<button
 				type="button"
 				onclick={() => (langModalOpen = false)}
-				class="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-[#555] hover:bg-[#2a2a2a] hover:text-white transition"
+				class="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-[var(--hb-faint)] hover:bg-[var(--hb-hover)] hover:text-white transition"
 				aria-label="Kapat"
 			>
 				<svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
@@ -2148,7 +2148,7 @@
 						type="button"
 						disabled={pdfGenerating}
 						onclick={() => generatePdf(lang.code)}
-						class="flex items-center gap-3 rounded-xl border border-[#2a2a2a] bg-[#111] px-4 py-3 text-sm font-medium text-white transition hover:border-[#444] hover:bg-[#222] disabled:opacity-50"
+						class="flex items-center gap-3 rounded-lg border border-[var(--hb-border)] bg-[#111] px-4 py-3 text-sm font-medium text-white transition hover:border-[var(--hb-highlight)] hover:bg-[#222] disabled:opacity-50"
 					>
 						<span class="text-xl leading-none">{lang.flag}</span>
 						<span>{lang.label}</span>
@@ -2160,7 +2160,7 @@
 			</div>
 
 			{#if pdfGenerating}
-				<p class="mt-4 text-center text-xs text-[#555]">PDF oluşturuluyor...</p>
+				<p class="mt-4 text-center text-xs text-[var(--hb-faint)]">PDF oluşturuluyor...</p>
 			{/if}
 		</div>
 	</div>
@@ -2178,14 +2178,14 @@
 		onkeydown={(e) => e.key === 'Escape' && (proformaModalOpen = false)}
 	>
 		<div
-			class="relative w-75 rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a] p-6 shadow-2xl"
+			class="relative w-75 rounded-2xl border border-[var(--hb-border)] bg-[var(--hb-list)] p-6 shadow-2xl"
 			role="presentation"
 			onclick={(e) => e.stopPropagation()}
 		>
 			<button
 				type="button"
 				onclick={() => (proformaModalOpen = false)}
-				class="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-[#555] hover:bg-[#2a2a2a] hover:text-white transition"
+				class="absolute right-4 top-4 flex h-7 w-7 items-center justify-center rounded-full text-[var(--hb-faint)] hover:bg-[var(--hb-hover)] hover:text-white transition"
 				aria-label="Kapat"
 			>
 				<svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
@@ -2201,7 +2201,7 @@
 						type="button"
 						disabled={pdfGenerating}
 						onclick={() => generateProformaPdf(lang.code)}
-						class="flex items-center gap-3 rounded-xl border border-[#2a2a2a] bg-[#111] px-4 py-3 text-sm font-medium text-white transition hover:border-[#444] hover:bg-[#222] disabled:opacity-50"
+						class="flex items-center gap-3 rounded-lg border border-[var(--hb-border)] bg-[#111] px-4 py-3 text-sm font-medium text-white transition hover:border-[var(--hb-highlight)] hover:bg-[#222] disabled:opacity-50"
 					>
 						<span class="text-xl leading-none">{lang.flag}</span>
 						<span>{lang.label}</span>
@@ -2213,7 +2213,7 @@
 			</div>
 
 			{#if pdfGenerating}
-				<p class="mt-4 text-center text-xs text-[#555]">Proforma PDF oluşturuluyor...</p>
+				<p class="mt-4 text-center text-xs text-[var(--hb-faint)]">Proforma PDF oluşturuluyor...</p>
 			{/if}
 		</div>
 	</div>
@@ -2232,17 +2232,17 @@
 		onkeydown={(e) => e.key === 'Escape' && (detailOpen = false)}
 	>
 		<div
-			class="relative flex w-180 max-h-[80vh] flex-col rounded-2xl border border-[#2a2a2a] bg-[#1a1a1a] shadow-2xl"
+			class="relative flex w-180 max-h-[80vh] flex-col rounded-2xl border border-[var(--hb-border)] bg-[var(--hb-list)] shadow-2xl"
 			role="presentation"
 			onclick={(e) => e.stopPropagation()}
 		>
 			<!-- Header -->
-			<div class="shrink-0 flex items-start justify-between border-b border-[#2a2a2a] px-6 py-4">
+			<div class="shrink-0 flex items-start justify-between border-b border-[var(--hb-border)] px-6 py-4">
 				<div class="shrink-0">
 					<p class="text-base font-bold text-white">
 						{(de as OrderRow).orderNumber}
 					</p>
-					<p class="text-xs text-[#555] mt-0.5">
+					<p class="text-xs text-[var(--hb-faint)] mt-0.5">
 						{formatDate(de.createdAt)}{customer ? ' · ' + customer.name : ''}
 					</p>
 				</div>
@@ -2262,7 +2262,7 @@
 					<button
 						type="button"
 						onclick={() => (detailOpen = false)}
-						class="flex h-7 w-7 items-center justify-center rounded-full text-[#555] transition hover:bg-[#2a2a2a] hover:text-white"
+						class="flex h-7 w-7 items-center justify-center rounded-full text-[var(--hb-faint)] transition hover:bg-[var(--hb-hover)] hover:text-white"
 						aria-label="Kapat"
 					>
 						<svg viewBox="0 0 20 20" fill="currentColor" class="h-4 w-4">
@@ -2279,24 +2279,24 @@
 						<div class="h-5 w-5 animate-spin rounded-full border-2 border-white border-t-transparent opacity-30"></div>
 					</div>
 				{:else if detailItemsSorted.length === 0}
-					<p class="py-8 text-center text-sm text-[#555]">Kalem bulunamadı.</p>
+					<p class="py-8 text-center text-sm text-[var(--hb-faint)]">Kalem bulunamadı.</p>
 				{:else}
 					<table class="w-full text-sm">
 						<thead>
-							<tr class="border-b border-[#2a2a2a] text-left">
-								<th class="pb-2 pr-3 text-xs font-medium text-[#555]">Ürün</th>
-								<th class="pb-2 pr-3 w-16 text-xs font-medium text-[#555] text-right">Miktar</th>
-								<th class="pb-2 pr-3 w-28 text-xs font-medium text-[#555] text-right">Birim Fiyat</th>
-								<th class="pb-2 w-28 text-xs font-medium text-[#555] text-right">Tutar</th>
+							<tr class="border-b border-[var(--hb-border)] text-left">
+								<th class="pb-2 pr-3 text-xs font-medium text-[var(--hb-faint)]">Ürün</th>
+								<th class="pb-2 pr-3 w-16 text-xs font-medium text-[var(--hb-faint)] text-right">Miktar</th>
+								<th class="pb-2 pr-3 w-28 text-xs font-medium text-[var(--hb-faint)] text-right">Birim Fiyat</th>
+								<th class="pb-2 w-28 text-xs font-medium text-[var(--hb-faint)] text-right">Tutar</th>
 							</tr>
 						</thead>
 						<tbody>
 							{#each detailItemsSorted as it (it.id)}
 								<tr class="border-b border-[#1e1e1e] {it.isIncludedPart ? 'opacity-60' : ''}">
 									<td class="py-2 pr-3">
-										<p class="{it.isIncludedPart ? 'text-[#888]' : 'text-white'}">{it.productName}</p>
+										<p class="{it.isIncludedPart ? 'text-[var(--hb-body)]' : 'text-white'}">{it.productName}</p>
 										{#if it.isIncludedPart}
-											<span class="text-[10px] text-[#555]">Dahil</span>
+											<span class="text-[10px] text-[var(--hb-faint)]">Dahil</span>
 										{/if}
 									</td>
 									<td class="py-2 pr-3 text-right text-[#aaa]">{it.quantity} {it.unit ?? ''}</td>
@@ -2307,25 +2307,25 @@
 						</tbody>
 					</table>
 
-					<div class="mt-4 flex flex-col items-end gap-1.5 border-t border-[#2a2a2a] pt-4">
+					<div class="mt-4 flex flex-col items-end gap-1.5 border-t border-[var(--hb-border)] pt-4">
 						<div class="flex items-center gap-6">
-							<span class="text-xs text-[#555]">Ara Toplam</span>
+							<span class="text-xs text-[var(--hb-faint)]">Ara Toplam</span>
 							<span class="w-36 text-right text-sm text-[#aaa]">{formatMoney(de.subtotal ?? 0, de.currency)}</span>
 						</div>
 						<div class="flex items-center gap-6">
-							<span class="text-xs text-[#555]">KDV</span>
+							<span class="text-xs text-[var(--hb-faint)]">KDV</span>
 							<span class="w-36 text-right text-sm text-[#aaa]">{formatMoney(de.totalVat ?? 0, de.currency)}</span>
 						</div>
 						<div class="flex items-center gap-6">
-							<span class="text-xs font-semibold text-[#888]">GENEL TOPLAM</span>
+							<span class="text-xs font-semibold text-[var(--hb-body)]">GENEL TOPLAM</span>
 							<span class="w-36 text-right text-base font-bold text-white">{formatMoney(de.totalWithVat, de.currency)}</span>
 						</div>
 					</div>
 
 					{#if de.notes?.trim()}
-						<div class="mt-4 rounded-lg border border-[#2a2a2a] bg-[#111] px-4 py-3">
-							<p class="mb-1 text-xs text-[#555]">Notlar</p>
-							<p class="whitespace-pre-wrap text-sm text-[#888]">{de.notes}</p>
+						<div class="mt-4 rounded-lg border border-[var(--hb-border)] bg-[#111] px-4 py-3">
+							<p class="mb-1 text-xs text-[var(--hb-faint)]">Notlar</p>
+							<p class="whitespace-pre-wrap text-sm text-[var(--hb-body)]">{de.notes}</p>
 						</div>
 					{/if}
 				{/if}

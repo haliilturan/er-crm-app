@@ -25,15 +25,15 @@
 </script>
 
 <div
-	class="flex items-center px-4 py-3 w-full rounded-2xl cursor-pointer transition-colors
-		{active ? 'bg-[#222]' : 'bg-[#1a1a1a] hover:bg-[#222]'}"
+	class="flex items-center px-4 py-3 w-full rounded-lg cursor-pointer transition-colors
+		{active ? 'bg-[var(--hb-active)]' : 'bg-[var(--hb-list)] hover:bg-[var(--hb-list-hover)]'}"
 	role="button"
 	tabindex="0"
 	{onclick}
 	onkeydown={(e) => e.key === 'Enter' && onclick?.()}
 >
 	{#if showAvatar}
-		<div class="mr-3 shrink-0 flex h-10 w-10 items-center justify-center rounded-full bg-[#333] text-xs font-medium text-white">
+		<div class="mr-3 shrink-0 flex h-10 w-10 items-center justify-center rounded-full bg-[var(--hb-muted)] text-xs font-medium text-white">
 			{#if avatar}
 				<img src={avatar} alt={title} class="h-full w-full rounded-full object-cover" />
 			{:else}
@@ -47,17 +47,17 @@
 			<span class="text-sm font-medium text-white leading-tight truncate">{title}</span>
 			<div class="flex items-center gap-2 shrink-0">
 				{#if tag}
-					<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-[#222] text-[#888]">
+					<span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs bg-[var(--hb-tag)] text-[var(--hb-title)]">
 						{tag}
 					</span>
 				{/if}
 				{#if timestamp}
-					<span class="text-xs text-[#555] whitespace-nowrap">{timestamp}</span>
+					<span class="text-xs text-[var(--hb-faint)] whitespace-nowrap">{timestamp}</span>
 				{/if}
 			</div>
 		</div>
 		{#if description}
-			<span class="text-xs text-[#888] leading-tight truncate">{description}</span>
+			<span class="text-xs text-[var(--hb-body)] leading-tight truncate">{description}</span>
 		{/if}
 	</div>
 </div>

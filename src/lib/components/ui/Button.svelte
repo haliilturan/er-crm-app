@@ -16,11 +16,11 @@
 	} = $props();
 
 	const variantClass: Record<string, string> = {
-		active: 'px-4 py-1.5 rounded-full bg-white text-black text-sm font-medium hover:bg-[#e0e0e0]',
-		default: 'px-4 py-1.5 rounded-full bg-[#222] text-white border border-[#2a2a2a] text-sm hover:bg-[#2a2a2a]',
-		ghost: 'px-4 py-1.5 rounded-full bg-transparent text-[#888] hover:text-white text-sm',
-		icon: 'p-2 rounded-full bg-[#222] text-[#888] hover:text-white border border-[#2a2a2a]',
-		danger: 'px-4 py-1.5 rounded-full bg-[#ff4444] text-white text-sm hover:bg-[#ff2222]'
+		active: 'px-4 py-1.5 rounded-full bg-[var(--hb-active)] text-white text-sm font-medium hover:bg-[var(--hb-hover)]',
+		default: 'px-4 py-1.5 rounded-full bg-[var(--hb-muted)] text-[var(--hb-body)] text-sm hover:bg-[var(--hb-hover)] hover:text-white',
+		ghost: 'px-4 py-1.5 rounded-full bg-transparent text-[var(--hb-body)] hover:text-white text-sm',
+		icon: 'p-2 rounded-full bg-[var(--hb-muted)] text-[var(--hb-body)] hover:text-white',
+		danger: 'px-4 py-1.5 rounded-full bg-[var(--hb-accent)] text-white text-sm hover:opacity-90'
 	};
 </script>
 

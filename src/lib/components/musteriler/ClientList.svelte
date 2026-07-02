@@ -204,7 +204,7 @@
 	<div class="flex shrink-0 items-center justify-between px-4 pb-3 pt-4">
 		<div>
 			<h2 class="text-2xl font-bold text-white">Müşteriler</h2>
-			<p class="mt-0.5 text-xs text-[#555]">
+			<p class="mt-0.5 text-xs text-[var(--hb-faint)]">
 				{#if activeMode === 'latest'}
 					{latest100.length} müşteri
 				{:else if debouncedQuery.length >= 3}
@@ -218,7 +218,7 @@
 			<button
 				type="button"
 				onclick={onNewClient}
-				class="flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-black transition hover:bg-[#e0e0e0]"
+				class="flex items-center gap-1.5 rounded-full bg-[var(--hb-active)] px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-[var(--hb-hover)]"
 			>
 				<svg
 					class="h-3.5 w-3.5"
@@ -236,13 +236,13 @@
 
 	<!-- Mode toggle -->
 	<div class="shrink-0 px-4 pb-3">
-		<div class="flex gap-1 rounded-xl bg-[#1a1a1a] p-1">
+		<div class="flex gap-1 rounded-lg bg-[var(--hb-track)] p-1">
 			<button
 				type="button"
 				onclick={() => switchMode('latest')}
 				class="flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors {activeMode === 'latest'
-					? 'bg-white text-black'
-					: 'text-[#777] hover:text-white'}"
+					? 'bg-[var(--hb-active)] text-white'
+					: 'text-[var(--hb-body)] hover:text-white'}"
 			>
 				Son Güncellenen
 			</button>
@@ -250,8 +250,8 @@
 				type="button"
 				onclick={() => switchMode('search')}
 				class="flex-1 rounded-lg py-1.5 text-xs font-medium transition-colors {activeMode === 'search'
-					? 'bg-white text-black'
-					: 'text-[#777] hover:text-white'}"
+					? 'bg-[var(--hb-active)] text-white'
+					: 'text-[var(--hb-body)] hover:text-white'}"
 			>
 				Tüm Müşteriler
 			</button>
@@ -262,7 +262,7 @@
 	<div class="shrink-0 px-4 pb-3">
 		<SearchInput bind:value={searchQuery} placeholder={placeholder} />
 		{#if showMinCharsHint}
-			<p class="mt-1.5 px-1 text-xs text-[#555]">En az 3 karakter girin</p>
+			<p class="mt-1.5 px-1 text-xs text-[var(--hb-faint)]">En az 3 karakter girin</p>
 		{/if}
 	</div>
 
@@ -274,12 +274,12 @@
 		{#if loading && activeMode === 'latest'}
 			<!-- Initial load skeleton (only blocks Mode 1; Mode 2 starts empty anyway) -->
 			{#each [1, 2, 3] as _k (_k)}
-				<div class="animate-pulse h-16 rounded-2xl bg-[#1a1a1a]"></div>
+				<div class="animate-pulse h-16 rounded-lg bg-[var(--hb-list)]"></div>
 			{/each}
 
 		{:else if showSearchIdleHint}
 			<div class="flex items-center justify-center py-20">
-				<p class="text-center text-sm leading-relaxed text-[#555]">
+				<p class="text-center text-sm leading-relaxed text-[var(--hb-faint)]">
 					Aramak için en az<br />3 karakter girin
 				</p>
 			</div>
@@ -287,17 +287,17 @@
 		{:else if isDebouncing}
 			<!-- Debounce in-flight: show skeleton so it doesn't feel frozen -->
 			{#each [1, 2, 3] as _k (_k)}
-				<div class="animate-pulse h-16 rounded-2xl bg-[#1a1a1a]"></div>
+				<div class="animate-pulse h-16 rounded-lg bg-[var(--hb-list)]"></div>
 			{/each}
 
 		{:else if activeMode === 'latest' && rawCustomers.length === 0 && !loading}
 			<div class="flex items-center justify-center py-20">
-				<p class="text-sm text-[#555]">Henüz müşteri eklenmedi</p>
+				<p class="text-sm text-[var(--hb-faint)]">Henüz müşteri eklenmedi</p>
 			</div>
 
 		{:else if showNoResults}
 			<div class="flex items-center justify-center py-20">
-				<p class="text-sm text-[#555]">Sonuç bulunamadı</p>
+				<p class="text-sm text-[var(--hb-faint)]">Sonuç bulunamadı</p>
 			</div>
 
 		{:else}

@@ -164,8 +164,8 @@
 <div bind:this={selectRef} class="relative w-full">
 	<!-- Trigger -->
 	<div
-		class="flex items-center rounded-xl px-3 py-2 w-full border transition-colors
-			{isOpen ? 'bg-[#222] border-[#444]' : 'bg-[#1a1a1a] border-[#2a2a2a] hover:border-[#444]'}
+		class="flex items-center rounded-lg px-3 py-2 w-full border transition-colors
+			{isOpen ? 'bg-[var(--hb-muted)] border-[var(--hb-highlight)]' : 'bg-[var(--hb-field)] border-[var(--hb-border)] hover:border-[var(--hb-highlight)]'}
 			{disabled ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}"
 		role="combobox"
 		aria-expanded={isOpen}
@@ -174,7 +174,7 @@
 	>
 		<div class="flex flex-col justify-center flex-1 min-w-0 gap-1">
 			{#if label}
-				<span class="text-xs text-[#888] leading-none">
+				<span class="text-xs text-[var(--hb-body)] leading-none">
 					{label}{required ? ' *' : ''}
 				</span>
 			{/if}
@@ -182,7 +182,7 @@
 				bind:this={triggerInputRef}
 				type="text"
 				class="bg-transparent border-none outline-none text-sm leading-none
-					{filled ? 'text-white' : 'text-[#555]'} cursor-pointer"
+					{filled ? 'text-white' : 'text-[var(--hb-faint)]'} cursor-pointer"
 				placeholder={isOpen && searchable ? searchPlaceholder : placeholder}
 				value={triggerValue}
 				{disabled}
@@ -198,7 +198,7 @@
 		</div>
 		<button
 			type="button"
-			class="flex items-center justify-center shrink-0 ml-2 text-[#555] hover:text-[#888] transition-colors"
+			class="flex items-center justify-center shrink-0 ml-2 text-[var(--hb-faint)] hover:text-[var(--hb-body)] transition-colors"
 			onclick={toggleList}
 			aria-label={isOpen ? 'Kapat' : 'Aç'}
 		>
@@ -225,13 +225,13 @@
 			style="top: {dropdownPosition.top}px; left: {dropdownPosition.left}px; width: {dropdownPosition.width}px; min-width: 120px;"
 		>
 			<div
-				class="bg-[#1a1a1a] border border-[#2a2a2a] rounded-xl shadow-lg py-1.5 max-h-60 overflow-y-auto"
+				class="bg-[var(--hb-surface)] border border-[var(--hb-border)] rounded-lg shadow-lg py-1.5 max-h-60 overflow-y-auto"
 				id={listboxId}
 				role="listbox"
 			>
 				{#each Object.entries(filteredGrouped) as [group, opts] (group)}
 					{#if group}
-						<div class="px-3 py-1 text-[11px] font-semibold text-[#555] uppercase tracking-wider">
+						<div class="px-3 py-1 text-[11px] font-semibold text-[var(--hb-faint)] uppercase tracking-wider">
 							{group}
 						</div>
 					{/if}
@@ -240,8 +240,8 @@
 							type="button"
 							class="flex w-full px-3 py-2 text-sm text-left transition-colors
 								{opt.value === value
-									? 'bg-[#333] text-white font-medium'
-									: 'text-[#888] hover:bg-[#222] hover:text-white'}"
+									? 'bg-[var(--hb-active)] text-white font-medium'
+									: 'text-[var(--hb-body)] hover:bg-[var(--hb-muted)] hover:text-white'}"
 							role="option"
 							aria-selected={opt.value === value}
 							onclick={() => selectOption(opt)}
@@ -251,7 +251,7 @@
 					{/each}
 				{/each}
 				{#if searchQuery.trim() && Object.keys(filteredGrouped).length === 0}
-					<div class="px-3 py-2.5 text-sm text-[#555] text-center">Sonuç bulunamadı</div>
+					<div class="px-3 py-2.5 text-sm text-[var(--hb-faint)] text-center">Sonuç bulunamadı</div>
 				{/if}
 			</div>
 		</div>

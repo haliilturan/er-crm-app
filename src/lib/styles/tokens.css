@@ -1,0 +1,23 @@
+/* ── hhboss tasarım dili — GLOBAL token'lar (--hb-*) ─────────────────────────
+   Değerler Cockpit'in scoped --ck-* değerleriyle BİREBİR aynıdır (renk tutarlılığı).
+   Font zaten global TM Sans (layout.css). */
+:root {
+	--hb-panel: #181818;
+	--hb-surface: #1a1a1a;
+	--hb-track: #1b1b1b;
+	--hb-active: #2c2c2e;
+	--hb-list: #1e1e1e;
+	--hb-list-hover: #2c2c2e;
+	--hb-muted: #242426;
+	--hb-hover: #333335;
+	--hb-highlight: #48484a;
+	--hb-border: #252525;
+	--hb-field: #121212;
+	--hb-tag: #3a3a3c;
+	--hb-title: #ffffff;
+	--hb-body: #727274;
+	--hb-faint: #545456;
+	--hb-accent: #ff3b30;
+	--hb-radius: 8px;
+	--hb-pill: 999px;
+}

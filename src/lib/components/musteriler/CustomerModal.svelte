@@ -271,10 +271,10 @@
 </script>
 
 <!-- ─── Panel ───────────────────────────────────────────────────────────────── -->
-<div class="flex h-full flex-col overflow-hidden bg-[#111111]">
+<div class="flex h-full flex-col overflow-hidden bg-[var(--hb-panel)]">
 
 	<!-- ── Header ───────────────────────────────────────────────────────────── -->
-	<div class="shrink-0 border-b border-[#2a2a2a] px-6 py-5">
+	<div class="shrink-0 border-b border-[var(--hb-border)] px-6 py-5">
 		<div class="flex items-start justify-between gap-3">
 			<SectionHead
 				title={form.name || (isNew ? 'Yeni Müşteri' : 'Müşteri Düzenle')}
@@ -284,8 +284,8 @@
 				type="button"
 				onclick={onClose}
 				aria-label="Kapat"
-				class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl text-[#555]
-					transition-colors hover:bg-[#222] hover:text-white"
+				class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-[var(--hb-faint)]
+					transition-colors hover:bg-[var(--hb-muted)] hover:text-white"
 			>
 				<svg class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -311,8 +311,8 @@
 
 				<!-- ── Section: Temel Bilgiler ─────────────────────────────────── -->
 				<div class="flex items-center gap-3 pb-1">
-					<span class="text-[11px] font-semibold uppercase tracking-widest text-[#444]">Temel Bilgiler</span>
-					<div class="h-px flex-1 bg-[#2a2a2a]"></div>
+					<span class="text-[11px] font-semibold uppercase tracking-widest text-[var(--hb-faint)]">Temel Bilgiler</span>
+					<div class="h-px flex-1 bg-[var(--hb-border)]"></div>
 				</div>
 
 				<TextInput
@@ -347,8 +347,8 @@
 
 				<!-- ── Section: Adres Bilgileri ───────────────────────────────── -->
 				<div class="flex items-center gap-3 pb-1 pt-3">
-					<span class="text-[11px] font-semibold uppercase tracking-widest text-[#444]">Adres Bilgileri</span>
-					<div class="h-px flex-1 bg-[#2a2a2a]"></div>
+					<span class="text-[11px] font-semibold uppercase tracking-widest text-[var(--hb-faint)]">Adres Bilgileri</span>
+					<div class="h-px flex-1 bg-[var(--hb-border)]"></div>
 				</div>
 
 				<Select
@@ -397,8 +397,8 @@
 
 				<!-- ── Section: İletişim Bilgileri ────────────────────────────── -->
 				<div class="flex items-center gap-3 pb-1 pt-3">
-					<span class="text-[11px] font-semibold uppercase tracking-widest text-[#444]">İletişim Bilgileri</span>
-					<div class="h-px flex-1 bg-[#2a2a2a]"></div>
+					<span class="text-[11px] font-semibold uppercase tracking-widest text-[var(--hb-faint)]">İletişim Bilgileri</span>
+					<div class="h-px flex-1 bg-[var(--hb-border)]"></div>
 				</div>
 
 				<TextInput
@@ -443,7 +443,7 @@
 				/>
 
 				{#if saveError}
-					<p class="rounded-xl border border-[#ff4444]/30 bg-[#2a1a1a] px-4 py-3 text-sm text-[#ff4444]">
+					<p class="rounded-lg border border-[var(--hb-accent)]/30 bg-[var(--hb-accent)]/10 px-4 py-3 text-sm text-[var(--hb-accent)]">
 						{saveError}
 					</p>
 				{/if}
@@ -451,11 +451,11 @@
 			</div>
 
 			<!-- Footer -->
-			<div class="shrink-0 flex items-center justify-between gap-3 border-t border-[#2a2a2a] px-5 py-4">
+			<div class="shrink-0 flex items-center justify-between gap-3 border-t border-[var(--hb-border)] px-5 py-4">
 				<button
 					type="button"
 					onclick={onClose}
-					class="rounded-full bg-[#222] px-6 py-2.5 text-sm text-white transition-colors hover:bg-[#2a2a2a]"
+					class="rounded-full bg-[var(--hb-muted)] px-6 py-2.5 text-sm text-[var(--hb-body)] transition-colors hover:bg-[var(--hb-hover)] hover:text-white"
 				>
 					İptal
 				</button>
@@ -463,7 +463,7 @@
 					type="submit"
 					disabled={saving}
 					style={saving ? 'pointer-events: none' : ''}
-					class="rounded-full bg-white px-6 py-2.5 text-sm font-medium text-black transition-opacity disabled:opacity-50"
+					class="rounded-full bg-[var(--hb-active)] px-6 py-2.5 text-sm font-medium text-white transition-opacity disabled:opacity-50"
 				>
 					{saving ? 'Kaydediliyor...' : isNew ? 'Müşteri Oluştur' : 'Kaydet'}
 				</button>
